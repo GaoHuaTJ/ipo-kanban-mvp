@@ -1090,3 +1090,185 @@ body {
     gap: 12px;
   }
 }
+
+/* ==================== 移动端精细适配 (<= 640px) ==================== */
+@media (max-width: 640px) {
+  .top-header-inner {
+    padding: 0 12px;
+    height: 52px;
+    gap: 8px;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .brand-title {
+    font-size: 15px;
+  }
+
+  .source-pill {
+    font-size: 11px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+
+  .main-container {
+    padding: 16px 12px 40px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .sub-tabs {
+    gap: 18px;
+    margin-bottom: 14px;
+  }
+
+  .sub-tab {
+    font-size: 14px;
+    padding: 8px 2px 10px;
+  }
+
+  .section-title {
+    font-size: 14.5px;
+  }
+
+  .map-panel {
+    min-height: 310px;
+  }
+
+  .chart-canvas-map {
+    height: 310px;
+  }
+
+  /* 统计矩阵表：手机一屏完整显示，不折行、不裁切右侧合计 */
+  .matrix-card {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .matrix-table {
+    font-size: 12px;
+    min-width: 336px;
+  }
+
+  .matrix-table thead th,
+  .matrix-table tbody td {
+    padding: 10px 4px;
+    white-space: nowrap;
+  }
+
+  .matrix-num.clickable {
+    padding: 2px 4px;
+  }
+
+  .matrix-footnote {
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  /* 中介排行卡片：标题与单选换行不挤压 */
+  .panel-card {
+    padding: 14px 12px;
+  }
+
+  .panel-card-header {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .radio-group {
+    gap: 12px;
+    font-size: 12.5px;
+  }
+
+  .chart-canvas-rank {
+    height: 340px;
+  }
+
+  /* 审核动态筛选区 */
+  .filter-box {
+    padding: 12px;
+  }
+
+  .filter-label {
+    width: 100%;
+    margin-bottom: -4px;
+  }
+
+  .input-control {
+    min-width: 100%;
+    max-width: 100%;
+  }
+
+  /* 详情页移动端适配 */
+  .detail-view {
+    margin: -16px -12px -40px;
+  }
+
+  .detail-banner {
+    padding: 14px 12px;
+  }
+
+  .detail-company-name {
+    font-size: 17px;
+  }
+
+  .timeline-strip {
+    padding: 18px 8px;
+  }
+
+  .timeline-label {
+    font-size: 12px;
+  }
+
+  .timeline-date {
+    font-size: 10px;
+    height: 16px;
+    margin-bottom: 8px;
+  }
+
+  .timeline-circle {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+
+  .timeline-step:not(:last-child)::after {
+    top: 44px;
+    left: calc(50% + 12px);
+    right: calc(-50% + 12px);
+    height: 3px;
+  }
+
+  .detail-body {
+    padding: 14px 12px 0;
+  }
+
+  .detail-card {
+    padding: 16px 14px;
+  }
+
+  .info-label {
+    width: 88px;
+    font-size: 12.5px;
+  }
+
+  .info-value {
+    font-size: 13px;
+  }
+
+  .doc-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .doc-left {
+    width: 100%;
+  }
+}
