@@ -128,8 +128,8 @@
     if (state.chinaMapLoaded) return true;
     if (state.chinaMapFailed) return false;
     const urls = [
+      "./data/china.json",
       "https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json",
-      "https://cdn.jsdelivr.net/gh/apache/echarts-website@asf-site/examples/data/asset/geo/china.json",
     ];
     for (const url of urls) {
       try {
