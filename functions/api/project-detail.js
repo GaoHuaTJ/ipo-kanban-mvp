@@ -143,7 +143,7 @@ async function fetchSzseDetail(company) {
 
   return {
     ok: true,
-    live_source: "深交所官网实时直连（Cloudflare 边缘透传）",
+    live_source: "深交所官网实时直连",
     company: d.cmpnm || company,
     exchange: "深交所",
     board: d.boardName || "",
@@ -263,7 +263,7 @@ async function fetchSseDetail(company) {
 
   return {
     ok: true,
-    live_source: "上交所官网实时直连（Cloudflare 边缘透传）",
+    live_source: "上交所官网实时直连",
     company: d.stockAuditName || company,
     exchange: "上交所",
     board: isStar ? "科创板" : "沪主板",
@@ -386,7 +386,7 @@ async function fetchBseDetail(company, securityCode = "") {
 
   return {
     ok: true,
-    live_source: "北交所官网实时直连（Cloudflare 边缘透传）",
+    live_source: "北交所官网实时直连",
     company: pn.companyName || company,
     exchange: "北交所",
     board: "北证",

@@ -761,7 +761,8 @@
 
   function applyLiveDetail(live, rec) {
     $("detail-live-dot").className = "source-dot";
-    $("detail-live-text").textContent = live.live_source || "交易所实时透传成功";
+    const cleanSource = String(live.live_source || "交易所实时直连").replace(/（[^）]*）|\([^)]*\)/g, "").trim();
+    $("detail-live-text").textContent = cleanSource || "交易所实时直连";
     $("detail-fallback-notice").classList.add("hidden");
     if (live.timeline && live.timeline.length) {
       renderTimeline(live.timeline);
