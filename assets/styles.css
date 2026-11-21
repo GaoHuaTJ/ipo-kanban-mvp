@@ -928,24 +928,29 @@ body {
   margin-right: 6px;
 }
 
-/* ==================== 项目详情页（Google 清爽风） ==================== */
+/* ==================== 项目详情页（Google 清爽风 · 与上方严格等宽对齐 + Banner 吸顶） ==================== */
 .detail-view {
   background: var(--surface-subtle);
-  margin: 12px -24px -60px;
-  padding-bottom: 60px;
-  min-height: calc(100vh - 180px);
+  margin: 16px 0 0;
+  padding-bottom: 36px;
+  border: 1px solid var(--border-light);
+  border-radius: 14px;
+  min-height: calc(100vh - 220px);
 }
 
 .detail-banner {
+  position: sticky;
+  top: 60px;
+  z-index: 90;
   background: linear-gradient(135deg, #f8faff 0%, #e8f0fe 100%);
-  padding: 22px 24px;
-  border-top: 1px solid #d2e3fc;
+  padding: 18px 24px;
   border-bottom: 1px solid #d2e3fc;
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.06);
 }
 
 .detail-banner-inner {
-  max-width: 1180px;
-  margin: 0 auto;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1437,10 +1442,11 @@ body {
   }
 
   .detail-view {
-    margin: 8px -12px -40px;
+    margin: 12px 0 0;
   }
 
   .detail-banner {
+    top: 54px;
     padding: 14px 12px;
   }
 
