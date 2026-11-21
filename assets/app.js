@@ -285,7 +285,7 @@
           trigger: "item",
           formatter: (p) => {
             const val = Array.isArray(p.value) ? p.value[2] : (p.value || 0);
-            return `<div style="font-weight:600;margin-bottom:2px;">${p.name}</div>在审企业：<b style="color:#9e2235">${val}</b> 家<br/><span style="font-size:11px;color:#888">点击查看明细</span>`;
+            return `<div style="font-weight:600;margin-bottom:2px;">${p.name}</div>在审企业：<b style="color:#1a73e8">${val}</b> 家<br/><span style="font-size:11px;color:#70757a">点击查看明细</span>`;
           },
         },
         visualMap: {
@@ -297,15 +297,15 @@
           itemHeight: 10,
           itemGap: 4,
           text: ["多", "少"],
-          textStyle: { color: "#8f959e", fontSize: 12 },
+          textStyle: { color: "#70757a", fontSize: 12 },
           seriesIndex: 0,
           pieces: [
-            { gt: 50, color: "#c99679" },
-            { gt: 20, lte: 50, color: "#dfb89c" },
-            { gt: 10, lte: 20, color: "#ecd2be" },
-            { gt: 3, lte: 10, color: "#f4e4d5" },
-            { gt: 0, lte: 3, color: "#faf1e6" },
-            { value: 0, color: "#fbf7f2" },
+            { gt: 50, color: "#669df6" },
+            { gt: 20, lte: 50, color: "#8ab4f8" },
+            { gt: 10, lte: 20, color: "#aecbfa" },
+            { gt: 3, lte: 10, color: "#d2e3fc" },
+            { gt: 0, lte: 3, color: "#e8f0fe" },
+            { value: 0, color: "#f8f9fa" },
           ],
         },
         geo: {
@@ -313,8 +313,8 @@
           roam: false,
           zoom: 1.22,
           center: [104.5, 35.8],
-          itemStyle: { areaColor: "#fbf7f2", borderColor: "#d9c9bd", borderWidth: 0.8 },
-          emphasis: { label: { show: false }, itemStyle: { areaColor: "#f2d6c9" } },
+          itemStyle: { areaColor: "#f8f9fa", borderColor: "#dadce0", borderWidth: 0.8 },
+          emphasis: { label: { show: false }, itemStyle: { areaColor: "#d2e3fc" } },
         },
         series: [
           { name: "省份热力", type: "map", geoIndex: 0, data: stats },
@@ -330,7 +330,7 @@
               if (v >= 10) return 23;
               return 20;
             },
-            itemStyle: { color: "#9e2235", shadowBlur: 6, shadowColor: "rgba(158,34,53,0.28)" },
+            itemStyle: { color: "#1a73e8", shadowBlur: 8, shadowColor: "rgba(26,115,232,0.32)" },
             label: { show: true, formatter: (p) => String(p.value[2]), color: "#fff", fontSize: 11, fontWeight: 600 },
             data: scatterData,
             zlevel: 2,
@@ -350,27 +350,27 @@
       tooltip: {
         trigger: "axis",
         axisPointer: { type: "shadow" },
-        formatter: (arr) => `${arr[0].name}：<b style="color:#9e2235">${arr[0].value}</b> 家`,
+        formatter: (arr) => `${arr[0].name}：<b style="color:#1a73e8">${arr[0].value}</b> 家`,
       },
       grid: { left: 16, right: 24, top: 20, bottom: 52, containLabel: true },
       xAxis: {
         type: "category",
         data: top15.map((x) => x.name.replace(/省|市|维吾尔自治区|壮族自治区|回族自治区|自治区/g, "")),
-        axisLabel: { color: "#5c626b", fontSize: 12, interval: 0, rotate: 32 },
-        axisLine: { lineStyle: { color: "#e8e0dc" } },
+        axisLabel: { color: "#5f6368", fontSize: 12, interval: 0, rotate: 32 },
+        axisLine: { lineStyle: { color: "#dadce0" } },
       },
       yAxis: {
         type: "value",
-        splitLine: { lineStyle: { color: "#f3ece9", type: "dashed" } },
-        axisLabel: { color: "#8f959e", fontSize: 12 },
+        splitLine: { lineStyle: { color: "#f1f3f4", type: "dashed" } },
+        axisLabel: { color: "#70757a", fontSize: 12 },
       },
       series: [
         {
           type: "bar",
           barMaxWidth: 22,
           data: top15.map((x) => ({ value: x.value, name: x.name })),
-          itemStyle: { color: "#9e2235", borderRadius: [4, 4, 0, 0] },
-          label: { show: true, position: "top", color: "#9e2235", fontSize: 11, fontWeight: 600 },
+          itemStyle: { color: "#1a73e8", borderRadius: [6, 6, 0, 0] },
+          label: { show: true, position: "top", color: "#1a73e8", fontSize: 11, fontWeight: 600 },
         },
       ],
     });
@@ -390,28 +390,28 @@
         trigger: "axis",
         axisPointer: { type: "shadow" },
         formatter: (arr) =>
-          `${arr[0].name}<br/>在审家数：<b style="color:#9e2235">${arr[0].value}</b> 家<br/><span style="font-size:11px;color:#888">点击筛选该机构在审企业</span>`,
+          `${arr[0].name}<br/>在审家数：<b style="color:#1a73e8">${arr[0].value}</b> 家<br/><span style="font-size:11px;color:#70757a">点击筛选该机构在审企业</span>`,
       },
       grid: { left: 10, right: 36, top: 8, bottom: 10, containLabel: true },
       xAxis: {
         type: "value",
-        splitLine: { lineStyle: { color: "#f4eeec", type: "dashed" } },
-        axisLabel: { color: "#8f959e", fontSize: 11 },
+        splitLine: { lineStyle: { color: "#f1f3f4", type: "dashed" } },
+        axisLabel: { color: "#70757a", fontSize: 11 },
       },
       yAxis: {
         type: "category",
         data: reversed.map((x) => x.name),
         axisLine: { show: false },
         axisTick: { show: false },
-        axisLabel: { color: "#3d424a", fontSize: 12, width: 130, overflow: "truncate" },
+        axisLabel: { color: "#202124", fontSize: 12, width: 130, overflow: "truncate" },
       },
       series: [
         {
           type: "bar",
           barWidth: 14,
           data: reversed.map((x) => x.value),
-          itemStyle: { color: "#9e2235", borderRadius: [0, 4, 4, 0] },
-          label: { show: true, position: "right", color: "#9e2235", fontSize: 12, fontWeight: 600 },
+          itemStyle: { color: "#1a73e8", borderRadius: [0, 6, 6, 0] },
+          label: { show: true, position: "right", color: "#1a73e8", fontSize: 12, fontWeight: 600 },
         },
       ],
     });
@@ -482,6 +482,11 @@
     $("filter-province").value = state.filters.province;
     $("filter-keyword").value = state.filters.keyword;
     $("filter-sort").value = state.filters.sortBy;
+    $("btn-clear-search").classList.toggle("hidden", !state.filters.keyword);
+
+    // 若选中了省份或非默认排序，高亮高级筛选按钮并在跳转时自动展开
+    const hasAdv = state.filters.province !== "全部" || state.filters.sortBy !== "update_date";
+    $("btn-toggle-advanced").classList.toggle("active-toggle", hasAdv || !$("advanced-drawer").classList.contains("hidden"));
   }
 
   function getFilteredRecords() {
@@ -529,7 +534,7 @@
     const start = (state.filters.page - 1) * pageSize;
     const pageRows = filtered.slice(start, start + pageSize);
 
-    $("dynamics-count").innerHTML = `为您找到 <b style="color:#9e2235;font-size:15px;">${total.toLocaleString()}</b> 条相关结果`;
+    $("dynamics-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 条相关结果`;
 
     const tbody = $("dynamics-tbody");
     if (!pageRows.length) {
@@ -940,7 +945,22 @@
     $("filter-keyword").addEventListener("input", (e) => {
       state.filters.keyword = e.target.value;
       state.filters.page = 1;
+      $("btn-clear-search").classList.toggle("hidden", !state.filters.keyword);
       renderDynamicsTable();
+    });
+
+    $("btn-clear-search").addEventListener("click", () => {
+      state.filters.keyword = "";
+      state.filters.page = 1;
+      syncDynamicsFilterUI();
+      renderDynamicsTable();
+      $("filter-keyword").focus();
+    });
+
+    $("btn-toggle-advanced").addEventListener("click", () => {
+      const drawer = $("advanced-drawer");
+      drawer.classList.toggle("hidden");
+      syncDynamicsFilterUI();
     });
 
     $("filter-sort").addEventListener("change", (e) => {

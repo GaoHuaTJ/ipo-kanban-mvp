@@ -150,9 +150,9 @@
 
     <!-- 视图 2：审核动态 -->
     <section id="view-dynamics" class="hidden">
-      <div class="filter-box">
+      <div class="filter-minimal">
         <div class="filter-row">
-          <span class="filter-label">场所</span>
+          <span class="filter-label">场所：</span>
           <div id="filter-exchange-chips" class="chip-list">
             <button class="chip-btn active" data-val="全部">全部</button>
             <button class="chip-btn" data-val="上交所">上交所</button>
@@ -162,7 +162,7 @@
         </div>
 
         <div class="filter-row">
-          <span class="filter-label">板块</span>
+          <span class="filter-label">板块：</span>
           <div id="filter-board-chips" class="chip-list">
             <button class="chip-btn active" data-val="全部">全部</button>
             <button class="chip-btn" data-val="沪主板">沪主板</button>
@@ -174,7 +174,7 @@
         </div>
 
         <div class="filter-row">
-          <span class="filter-label">阶段</span>
+          <span class="filter-label">阶段：</span>
           <div id="filter-stage-chips" class="chip-list">
             <button class="chip-btn active" data-val="全部">全部</button>
             <button class="chip-btn" data-val="在审汇总">仅看在审</button>
@@ -188,23 +188,40 @@
           </div>
         </div>
 
-        <div class="filter-row">
-          <span class="filter-label">精确筛选</span>
-          <div class="filter-controls">
-            <select id="filter-province" class="select-control" aria-label="按省份筛选"></select>
+        <!-- 突出 Google 风格大号胶囊搜索栏 -->
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
             <input
               id="filter-keyword"
-              class="input-control"
+              class="google-search-input"
               type="text"
-              placeholder="搜索发行人名称、保荐机构、律师、会计师或行业..."
+              placeholder="搜索发行人名称、保荐机构、律师事务所、会计师事务所或行业..."
             />
-            <select id="filter-sort" class="select-control" aria-label="排序方式">
-              <option value="update_date">按更新日期降序</option>
-              <option value="accept_date">按受理日期降序</option>
-            </select>
-            <button id="btn-reset-filters" class="action-btn">重置</button>
-            <button id="btn-export-excel" class="action-btn primary">导出 Excel</button>
+            <button id="btn-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
           </div>
+
+          <button id="btn-toggle-advanced" class="action-btn" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="8" y1="12" x2="16" y2="12"></line><line x1="11" y1="18" x2="13" y2="18"></line></svg>
+            <span>高级筛选</span>
+          </button>
+
+          <button id="btn-export-excel" class="action-btn primary" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>导出 Excel</span>
+          </button>
+        </div>
+
+        <!-- 默认折叠的高级筛选抽屉（省份 / 排序 / 重置） -->
+        <div id="advanced-drawer" class="advanced-drawer hidden">
+          <select id="filter-province" class="select-control" aria-label="按省份筛选"></select>
+          <select id="filter-sort" class="select-control" aria-label="排序方式">
+            <option value="update_date">按更新日期降序</option>
+            <option value="accept_date">按受理日期降序</option>
+          </select>
+          <button id="btn-reset-filters" class="action-btn sm" type="button">重置全部条件</button>
         </div>
       </div>
 
@@ -235,8 +252,8 @@
 
       <div class="pagination">
         <span id="page-info" class="page-info">第 1 / 1 页</span>
-        <button id="btn-prev-page" class="action-btn">上一页</button>
-        <button id="btn-next-page" class="action-btn">下一页</button>
+        <button id="btn-prev-page" class="action-btn sm">上一页</button>
+        <button id="btn-next-page" class="action-btn sm">下一页</button>
       </div>
     </section>
 
