@@ -95,7 +95,7 @@
       keyword: "",
       sortBy: "update_date",
       page: 1,
-      pageSize: 20,
+      pageSize: 30,
     },
   };
 
@@ -544,20 +544,20 @@
         .map(
           (r, idx) => `
           <tr class="clickable-row" data-rec-idx="${idx}">
-            <td style="color:#8f959e;">${start + idx + 1}</td>
+            <td><span class="row-index-badge">${start + idx + 1}</span></td>
             <td>
               <span class="company-link">${escapeHtml(r.company)}</span>
-              <div style="font-size:11px;color:#8f959e;margin-top:2px;">${escapeHtml(r.industry || "")}</div>
+              <div class="company-industry">${escapeHtml(r.industry || "")}</div>
             </td>
-            <td style="white-space:nowrap;">${escapeHtml(r.exchange)}</td>
-            <td><span class="board-tag">${escapeHtml(r.board)}</span></td>
-            <td><span class="stage-tag stage-${escapeHtml(r.stage)}">${escapeHtml(r.raw_status || r.stage)}</span></td>
-            <td style="white-space:nowrap;">${escapeHtml(r.province.replace(/省|市|维吾尔自治区|壮族自治区|回族自治区|自治区/g, ""))}</td>
-            <td>${escapeHtml((r.sponsors || []).join("、") || "-")}</td>
-            <td>${escapeHtml((r.law_firms || []).join("、") || "-")}</td>
-            <td>${escapeHtml((r.accounting_firms || []).join("、") || "-")}</td>
-            <td style="white-space:nowrap;color:#5c626b;">${escapeHtml(r.update_date || "-")}</td>
-            <td style="white-space:nowrap;color:#5c626b;">${escapeHtml(r.accept_date || "-")}</td>
+            <td style="white-space:nowrap;color:#5f6368;font-weight:500;">${escapeHtml(r.exchange)}</td>
+            <td><span class="board-tag board-${escapeHtml(r.board)}">${escapeHtml(r.board)}</span></td>
+            <td><span class="stage-tag stage-${escapeHtml(r.stage)}"><span class="status-dot"></span>${escapeHtml(r.raw_status || r.stage)}</span></td>
+            <td style="white-space:nowrap;color:#3c4043;">${escapeHtml(r.province.replace(/省|市|维吾尔自治区|壮族自治区|回族自治区|自治区/g, ""))}</td>
+            <td style="color:#3c4043;">${escapeHtml((r.sponsors || []).join("、") || "-")}</td>
+            <td style="color:#5f6368;">${escapeHtml((r.law_firms || []).join("、") || "-")}</td>
+            <td style="color:#5f6368;">${escapeHtml((r.accounting_firms || []).join("、") || "-")}</td>
+            <td class="date-cell">${escapeHtml(r.update_date || "-")}</td>
+            <td class="date-cell muted">${escapeHtml(r.accept_date || "-")}</td>
           </tr>`
         )
         .join("");
@@ -595,7 +595,9 @@
         <div class="timeline-step ${s.done ? "done" : ""}">
           <div class="timeline-label">${escapeHtml(s.label)}</div>
           <div class="timeline-date">${escapeHtml(s.date || "")}</div>
-          <div class="timeline-circle">✓</div>
+          <div class="timeline-track">
+            <div class="timeline-circle">✓</div>
+          </div>
         </div>`
       )
       .join("");
@@ -970,8 +972,15 @@
     });
 
     $("btn-reset-filters").addEventListener("click", () => {
-      state.filters = { exchange: "全部", board: "全部", stage: "全部", province: "全部", keyword: "", sortBy: "update_date", page: 1, pageSize: 20 };
+      const keepSize = state.filters.pageSize;
+      state.filters = { exchange: "全部", board: "全部", stage: "全部", province: "全部", keyword: "", sortBy: "update_date", page: 1, pageSize: keepSize };
       syncDynamicsFilterUI();
+      renderDynamicsTable();
+    });
+
+    $("filter-page-size").addEventListener("change", (e) => {
+      state.filters.pageSize = Number(e.target.value) || 30;
+      state.filters.page = 1;
       renderDynamicsTable();
     });
 

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#1A73E8"/>
+      <stop offset="100%" stop-color="#4F46E5"/>
+    </linearGradient>
+    <linearGradient id="barGrad" x1="0" y1="20" x2="0" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#C7D2FE"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bgGrad)"/>
+  <!-- 金融柱状图 -->
+  <rect x="13" y="36" width="8" height="15" rx="3" fill="url(#barGrad)" opacity="0.88"/>
+  <rect x="25" y="29" width="8" height="22" rx="3" fill="url(#barGrad)" opacity="0.94"/>
+  <rect x="37" y="21" width="8" height="30" rx="3" fill="#FFFFFF"/>
+  <!-- 上升趋势折线与箭头 -->
+  <path d="M14 29L27 20L38 24L50 13" stroke="#34D399" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M43.5 13H50V19.5" stroke="#34D399" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- 高亮点 -->
+  <circle cx="50" cy="13" r="3" fill="#FDE047"/>
+</svg>

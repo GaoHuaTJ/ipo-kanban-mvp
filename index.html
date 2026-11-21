@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>首发上市 - A股IPO在审全景看板（MVP）</title>
+  <title>IPO 智览 · 首发上市全景看板</title>
+  <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
   <link rel="stylesheet" href="./assets/styles.css" />
   <script src="./assets/vendor/echarts.min.js"></script>
   <script src="./assets/vendor/xlsx.full.min.js"></script>
@@ -13,10 +14,10 @@
   <header class="top-header">
     <div class="top-header-inner">
       <div class="brand-wrap">
-        <div class="brand-logo">IPO</div>
+        <img class="brand-logo-img" src="./assets/logo.svg" alt="IPO 智览 Logo" />
         <div class="brand-text">
           <span class="brand-title">IPO 智览</span>
-          <span class="brand-sub">零成本首发上市看板</span>
+          <span class="brand-sub">A股首发上市实时看板</span>
         </div>
       </div>
 
@@ -46,17 +47,46 @@
       <h1 class="page-title">首发上市</h1>
     </div>
 
-    <!-- 二级 Tab 栏（完整复刻 9 大栏目） -->
-    <div class="sub-tabs" role="tablist">
-      <button class="sub-tab active" data-tab="全景图" role="tab">全景图</button>
-      <button class="sub-tab" data-tab="审核动态" role="tab">审核动态</button>
-      <button class="sub-tab" data-tab="上市委审议" role="tab">上市委审议</button>
-      <button class="sub-tab" data-tab="发行动态" role="tab">发行动态</button>
-      <button class="sub-tab" data-tab="现场检查" role="tab">现场检查</button>
-      <button class="sub-tab" data-tab="监管措施" role="tab">监管措施</button>
-      <button class="sub-tab" data-tab="辅导备案" role="tab">辅导备案</button>
-      <button class="sub-tab" data-tab="新三板挂牌" role="tab">新三板挂牌</button>
-      <button class="sub-tab" data-tab="港股IPO" role="tab">港股IPO</button>
+    <!-- 二级 Tab 栏（现代化悬浮胶囊导航） -->
+    <div class="sub-tabs-shell">
+      <div class="sub-tabs" role="tablist">
+        <button class="sub-tab active" data-tab="全景图" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span>全景图</span>
+        </button>
+        <button class="sub-tab" data-tab="审核动态" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>审核动态</span>
+        </button>
+        <button class="sub-tab" data-tab="上市委审议" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>上市委审议</span>
+        </button>
+        <button class="sub-tab" data-tab="发行动态" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          <span>发行动态</span>
+        </button>
+        <button class="sub-tab" data-tab="现场检查" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span>现场检查</span>
+        </button>
+        <button class="sub-tab" data-tab="监管措施" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <span>监管措施</span>
+        </button>
+        <button class="sub-tab" data-tab="辅导备案" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          <span>辅导备案</span>
+        </button>
+        <button class="sub-tab" data-tab="新三板挂牌" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>新三板挂牌</span>
+        </button>
+        <button class="sub-tab" data-tab="港股IPO" role="tab">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
+          <span>港股IPO</span>
+        </button>
+      </div>
     </div>
 
     <!-- 视图 1：全景图 -->
@@ -250,10 +280,21 @@
         </table>
       </div>
 
-      <div class="pagination">
-        <span id="page-info" class="page-info">第 1 / 1 页</span>
-        <button id="btn-prev-page" class="action-btn sm">上一页</button>
-        <button id="btn-next-page" class="action-btn sm">下一页</button>
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="filter-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="30" selected>30 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="page-info" class="page-info">第 1 / 1 页</span>
+          <button id="btn-prev-page" class="action-btn sm">上一页</button>
+          <button id="btn-next-page" class="action-btn sm">下一页</button>
+        </div>
       </div>
     </section>
 
