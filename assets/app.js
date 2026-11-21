@@ -157,7 +157,6 @@
     $("source-text").textContent = isDemo
       ? `演示快照 · 在审 ${activeTotal} 家`
       : `实时数据 · 在审 ${activeTotal} / 全量 ${allTotal}`;
-    $("data-hint-text").textContent = meta.data_source_label || "";
   }
 
   // ==================== 全景图聚合与渲染（仅统计当前在审） ====================
@@ -788,10 +787,11 @@
     renderDynamicsTable();
   }
 
-  function exportFilteredCsv() {
+  function exportFilteredExcel() {
     const filtered = getFilteredRecords();
-    const headers = ["发行人全称", "场所", "板块", "审核状态", "注册地", "所属行业", "保荐机构", "律师事务所", "会计师事务所", "更新日期", "受理日期"];
-    const rows = filtered.map((r) => [
+    const headers = ["序号", "发行人全称", "场所", "板块", "审核状态", "注册地", "所属行业", "保荐机构", "律师事务所", "会计师事务所", "更新日期", "受理日期"];
+    const rows = filtered.map((r, idx) => [
+      idx + 1,
       r.company,
       r.exchange,
       r.board,
@@ -804,14 +804,33 @@
       r.update_date,
       r.accept_date,
     ]);
-    const csvLines = [headers, ...rows].map((line) =>
-      line.map((cell) => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")
-    );
-    const blob = new Blob(["\uFEFF" + csvLines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const dateTag = (state.meta && state.meta.update_date) || "export";
+
+    // 优先使用 SheetJS 导出标准 .xlsx 文件
+    if (window.XLSX) {
+      const ws = window.XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      ws["!cols"] = [
+        { wch: 6 }, { wch: 34 }, { wch: 10 }, { wch: 10 }, { wch: 14 },
+        { wch: 12 }, { wch: 26 }, { wch: 22 }, { wch: 24 }, { wch: 24 },
+        { wch: 13 }, { wch: 13 },
+      ];
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, "A股IPO审核动态");
+      window.XLSX.writeFile(wb, `A股IPO审核动态_${dateTag}.xlsx`);
+      return;
+    }
+
+    // 离线兜底：导出 Excel 可直接打开的 HTML 表格 .xls
+    const tableHtml =
+      `<html><head><meta charset="UTF-8"></head><body><table>` +
+      `<tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>` +
+      rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("") +
+      `</table></body></html>`;
+    const blob = new Blob(["\uFEFF" + tableHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `A股IPO审核动态_${(state.meta && state.meta.update_date) || "export"}.csv`;
+    a.download = `A股IPO审核动态_${dateTag}.xls`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -936,7 +955,7 @@
       renderDynamicsTable();
     });
 
-    $("btn-export-csv").addEventListener("click", exportFilteredCsv);
+    $("btn-export-excel").addEventListener("click", exportFilteredExcel);
 
     $("btn-prev-page").addEventListener("click", () => {
       if (state.filters.page > 1) {

@@ -6,6 +6,7 @@
   <title>首发上市 - A股IPO在审全景看板（MVP）</title>
   <link rel="stylesheet" href="./assets/styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/echarts@5.5.0/dist/echarts.min.js'"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js'"></script>
 </head>
 <body>
   <!-- 顶部导航栏 -->
@@ -43,7 +44,6 @@
   <main class="main-container">
     <div class="page-title-row">
       <h1 class="page-title">首发上市</h1>
-      <span id="data-hint-text" class="data-hint"></span>
     </div>
 
     <!-- 二级 Tab 栏（完整复刻 9 大栏目） -->
@@ -203,14 +203,13 @@
               <option value="accept_date">按受理日期降序</option>
             </select>
             <button id="btn-reset-filters" class="action-btn">重置</button>
-            <button id="btn-export-csv" class="action-btn primary">导出 CSV</button>
+            <button id="btn-export-excel" class="action-btn primary">导出 Excel</button>
           </div>
         </div>
       </div>
 
       <div class="table-toolbar">
         <span id="dynamics-count">为您找到 0 条相关结果</span>
-        <span class="data-hint">点击任意企业即可通过方案 B 实时透传查看项目详情（时间轴、募集资金、签字人员与信披 PDF）</span>
       </div>
 
       <div class="table-wrap">
