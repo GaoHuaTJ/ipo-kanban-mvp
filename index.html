@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>首发上市 - A股IPO在审全景看板（MVP）</title>
+  <link rel="stylesheet" href="./assets/styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js" onerror="this.onerror=null;this.src='https://unpkg.com/echarts@5.5.0/dist/echarts.min.js'"></script>
+</head>
+<body>
+  <!-- 顶部导航栏 -->
+  <header class="top-header">
+    <div class="top-header-inner">
+      <div class="brand-wrap">
+        <div class="brand-logo">IPO</div>
+        <div class="brand-text">
+          <span class="brand-title">IPO 智览</span>
+          <span class="brand-sub">零成本首发上市看板</span>
+        </div>
+      </div>
+
+      <nav class="top-nav" aria-label="主导航">
+        <a class="top-nav-item active" href="javascript:void(0)">首发上市</a>
+        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">再融重组</a>
+        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">固定收益</a>
+        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">信披检索</a>
+        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">监管处罚<span class="badge-new">NEW</span></a>
+        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">证券法规</a>
+        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">上市公司</a>
+        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">中介机构</a>
+      </nav>
+
+      <div class="header-right">
+        <div class="source-pill" title="运行 scripts/fetch_ipo_data.py 可更新为当日官方实时数据">
+          <span id="source-dot" class="source-dot"></span>
+          <span id="source-text">数据加载中...</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主内容区 -->
+  <main class="main-container">
+    <div class="page-title-row">
+      <h1 class="page-title">首发上市</h1>
+      <span id="data-hint-text" class="data-hint"></span>
+    </div>
+
+    <!-- 二级 Tab 栏（完整复刻 9 大栏目） -->
+    <div class="sub-tabs" role="tablist">
+      <button class="sub-tab active" data-tab="全景图" role="tab">全景图</button>
+      <button class="sub-tab" data-tab="审核动态" role="tab">审核动态</button>
+      <button class="sub-tab" data-tab="上市委审议" role="tab">上市委审议</button>
+      <button class="sub-tab" data-tab="发行动态" role="tab">发行动态</button>
+      <button class="sub-tab" data-tab="现场检查" role="tab">现场检查</button>
+      <button class="sub-tab" data-tab="监管措施" role="tab">监管措施</button>
+      <button class="sub-tab" data-tab="辅导备案" role="tab">辅导备案</button>
+      <button class="sub-tab" data-tab="新三板挂牌" role="tab">新三板挂牌</button>
+      <button class="sub-tab" data-tab="港股IPO" role="tab">港股IPO</button>
+    </div>
+
+    <!-- 视图 1：全景图 -->
+    <section id="view-overview">
+      <div class="market-filter-row">
+        <span class="market-label">市场：</span>
+        <div id="market-switch" class="segmented-group">
+          <button class="seg-btn active" data-market="A股IPO">A股IPO</button>
+          <button class="seg-btn" data-market="IPO辅导">IPO辅导</button>
+          <button class="seg-btn" data-market="新三板挂牌">新三板挂牌</button>
+          <button class="seg-btn" data-market="港股IPO">港股IPO</button>
+        </div>
+      </div>
+
+      <div id="ashare-overview-content">
+        <div class="section-header">
+          <div class="section-title-left">
+            <h2 id="overview-date-text" class="section-title">截止：-- A股IPO在审</h2>
+            <div id="map-mode-switch" class="segmented-group">
+              <button class="seg-btn active" data-mode="heatmap">热力图</button>
+              <button class="seg-btn" data-mode="bar">柱状图</button>
+            </div>
+          </div>
+          <span class="data-hint">提示：点击地图省份、统计表数字或机构柱状图，均可直接钻取查看企业明细</span>
+        </div>
+
+        <!-- 上半区：左侧中国地图热力图 + 右侧板块×阶段统计表 -->
+        <div class="overview-top-grid">
+          <div class="map-panel">
+            <div id="map-chart" class="chart-canvas-map"></div>
+            <div id="map-fallback-tip" class="map-fallback-tip hidden"></div>
+          </div>
+
+          <div class="matrix-card">
+            <table class="matrix-table">
+              <thead>
+                <tr>
+                  <th>审核阶段</th>
+                  <th>沪主板</th>
+                  <th>科创板</th>
+                  <th>深主板</th>
+                  <th>创业板</th>
+                  <th>北证</th>
+                  <th>合计</th>
+                </tr>
+              </thead>
+              <tbody id="matrix-tbody"></tbody>
+            </table>
+            <div class="matrix-footnote">
+              <span>口径：沪深北交易所当前在审企业（不含终止/注册生效）</span>
+              <span>点击数字可筛选明细</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 下半区：保荐机构 + 律所/会所排行 -->
+        <div class="overview-bottom-grid">
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <h3 class="section-title">A股IPO在审（保荐机构）</h3>
+              <span class="data-hint">TOP 15 · 含联合保荐</span>
+            </div>
+            <div id="sponsor-chart" class="chart-canvas-rank"></div>
+          </div>
+
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <h3 class="section-title">A股IPO在审</h3>
+              <div class="radio-group">
+                <label class="radio-label">
+                  <input type="radio" name="rightOrgType" value="law" checked />
+                  <span>律师事务所</span>
+                </label>
+                <label class="radio-label">
+                  <input type="radio" name="rightOrgType" value="accounting" />
+                  <span>会计师事务所</span>
+                </label>
+              </div>
+            </div>
+            <div id="right-org-chart" class="chart-canvas-rank"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 其他市场占位提示 -->
+      <div id="market-placeholder" class="placeholder-card hidden">
+        <h3 id="market-placeholder-title">MVP 二期规划</h3>
+        <p>MVP 第一版优先聚焦「A股IPO 全景图 + 审核动态」，后续可按相同零成本架构无缝扩展其他市场。</p>
+      </div>
+    </section>
+
+    <!-- 视图 2：审核动态 -->
+    <section id="view-dynamics" class="hidden">
+      <div class="filter-box">
+        <div class="filter-row">
+          <span class="filter-label">场所</span>
+          <div id="filter-exchange-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="上交所">上交所</button>
+            <button class="chip-btn" data-val="深交所">深交所</button>
+            <button class="chip-btn" data-val="北交所">北交所</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">板块</span>
+          <div id="filter-board-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="沪主板">沪主板</button>
+            <button class="chip-btn" data-val="科创板">科创板</button>
+            <button class="chip-btn" data-val="深主板">深主板</button>
+            <button class="chip-btn" data-val="创业板">创业板</button>
+            <button class="chip-btn" data-val="北证">北证</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">阶段</span>
+          <div id="filter-stage-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="在审汇总">仅看在审</button>
+            <button class="chip-btn" data-val="受理">受理</button>
+            <button class="chip-btn" data-val="问询">问询</button>
+            <button class="chip-btn" data-val="上市委">上市委</button>
+            <button class="chip-btn" data-val="提交注册">提交注册</button>
+            <button class="chip-btn" data-val="注册同意">注册同意</button>
+            <button class="chip-btn" data-val="中止">中止</button>
+            <button class="chip-btn" data-val="终止">终止</button>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <span class="filter-label">精确筛选</span>
+          <div class="filter-controls">
+            <select id="filter-province" class="select-control" aria-label="按省份筛选"></select>
+            <input
+              id="filter-keyword"
+              class="input-control"
+              type="text"
+              placeholder="搜索发行人名称、保荐机构、律师、会计师或行业..."
+            />
+            <select id="filter-sort" class="select-control" aria-label="排序方式">
+              <option value="update_date">按更新日期降序</option>
+              <option value="accept_date">按受理日期降序</option>
+            </select>
+            <button id="btn-reset-filters" class="action-btn">重置</button>
+            <button id="btn-export-csv" class="action-btn primary">导出 CSV</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="dynamics-count">为您找到 0 条相关结果</span>
+        <span class="data-hint">点击任意企业即可通过方案 B 实时透传查看项目详情（时间轴、募集资金、签字人员与信披 PDF）</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>发行人全称 / 行业</th>
+              <th>场所</th>
+              <th>板块</th>
+              <th>审核状态</th>
+              <th>注册地</th>
+              <th>保荐机构</th>
+              <th>律师</th>
+              <th>会计师</th>
+              <th>更新日期</th>
+              <th>受理日期</th>
+            </tr>
+          </thead>
+          <tbody id="dynamics-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <span id="page-info" class="page-info">第 1 / 1 页</span>
+        <button id="btn-prev-page" class="action-btn">上一页</button>
+        <button id="btn-next-page" class="action-btn">下一页</button>
+      </div>
+    </section>
+
+    <!-- 视图 3：项目详情页（方案 B 实时透传，还原图 2） -->
+    <section id="view-detail" class="detail-view hidden">
+      <div class="detail-banner">
+        <div class="detail-banner-inner">
+          <div class="detail-banner-left">
+            <button id="btn-back-list" class="back-btn">← 返回列表</button>
+            <h2 id="detail-company-name" class="detail-company-name">项目详情</h2>
+            <span id="detail-exchange-badge" class="detail-badge"></span>
+            <span id="detail-board-badge" class="detail-badge"></span>
+          </div>
+          <div id="detail-live-pill" class="live-status-pill">
+            <span id="detail-live-dot" class="source-dot"></span>
+            <span id="detail-live-text">正在实时透传交易所详情...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 节点绿色审核进度时间轴 -->
+      <div class="timeline-strip">
+        <div id="detail-timeline" class="timeline-inner"></div>
+      </div>
+
+      <div class="detail-body">
+        <div id="detail-fallback-notice" class="detail-notice hidden"></div>
+
+        <div class="detail-tabs">
+          <button class="detail-tab active" data-dtab="info">项目信息</button>
+          <button class="detail-tab" data-dtab="docs">信披文件<span id="detail-docs-count"></span></button>
+          <button class="detail-tab" data-dtab="fundamental">企业基本面</button>
+          <button class="detail-tab" data-dtab="issue">发行动态</button>
+        </div>
+
+        <!-- 详情 Tab 1：项目信息 -->
+        <div id="dtab-info">
+          <div class="detail-card">
+            <div class="detail-card-title">（一）基本信息</div>
+            <div id="detail-info-grid" class="info-grid"></div>
+          </div>
+
+          <div class="detail-card">
+            <div class="detail-card-title">（二）最新审核信息披露文件（实时透传）</div>
+            <div id="detail-docs-preview" class="doc-list"></div>
+          </div>
+        </div>
+
+        <!-- 详情 Tab 2：全部信披文件 -->
+        <div id="dtab-docs" class="hidden">
+          <div class="detail-card">
+            <div class="detail-card-title">全部信息披露与问询回复文件</div>
+            <div id="detail-docs-full" class="doc-list"></div>
+          </div>
+        </div>
+
+        <!-- 详情 Tab 3/4：二期规划 -->
+        <div id="dtab-future" class="hidden">
+          <div class="detail-card">
+            <div class="placeholder-card" style="margin:0;border:none;background:transparent;padding:24px 0;">
+              <h3 id="dtab-future-title">二期规划模块</h3>
+              <p id="dtab-future-desc"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图 4：二期规划占位页 -->
+    <section id="view-placeholder" class="hidden">
+      <div class="placeholder-card">
+        <h3 id="placeholder-title">二期规划模块</h3>
+        <p id="placeholder-desc"></p>
+        <div id="placeholder-source" class="placeholder-meta"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- 内嵌本地 JS 数据兜底（双击打开 index.html 也能正常加载） -->
+  <script src="./data/ipo_data.js"></script>
+  <script src="./assets/app.js"></script>
+</body>
+</html>

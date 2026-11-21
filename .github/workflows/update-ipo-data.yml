@@ -1,0 +1,38 @@
+name: 每日自动更新 A股IPO 在审数据
+
+on:
+  schedule:
+    # 每天北京时间 08:30（UTC 00:30）与 19:30（UTC 11:30）各更新一次
+    - cron: "30 0 * * *"
+    - cron: "30 11 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 抓取最新 A股IPO 在审数据（零第三方依赖）
+        run: python3 scripts/fetch_ipo_data.py --source eastmoney
+
+      - name: 提交并推送更新后的数据文件
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/ipo_data.json data/ipo_data.js
+          if git diff --cached --quiet; then
+            echo "数据无变化，跳过提交"
+          else
+            git commit -m "chore(data): 自动更新 A股IPO 在审数据 $(date +'%Y-%m-%d')"
+            git push
+          fi
