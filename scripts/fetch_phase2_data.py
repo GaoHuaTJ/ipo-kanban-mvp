@@ -170,9 +170,61 @@ def fetch_committee_records():
     return out
 
 
-def fetch_issuance_records():
-    """采集 2023-01-01 至今的沪深北新股发行动态。"""
+def build_bse_enrichment_maps(data_dir, committee_records):
+    """
+    融合上市委审议数据与 ipo_data.json，构建北交所/全板块的 (公司全称, 主承销商) 补全索引。
+    解决东财 RPTA_APP_IPOAPPLY 对北交所新股缺失 RECOMMEND_ORG 与 SECURITY_NAME_FULL 的问题。
+    """
+    by_abbr = {}
+    by_full = {}
+    all_entries = []
+
+    for r in committee_records:
+        abbr = (r.get("abbr") or "").strip()
+        comp = (r.get("company") or "").strip()
+        sponsor = (r.get("sponsor") or "").strip()
+        if abbr and (comp or sponsor):
+            by_abbr.setdefault(abbr, (comp, sponsor))
+        if comp:
+            by_full.setdefault(comp, (comp, sponsor))
+            all_entries.append((comp, sponsor))
+
+    ipo_json = os.path.join(data_dir, "ipo_data.json")
+    if os.path.exists(ipo_json):
+        try:
+            ipo_recs = json.load(open(ipo_json, encoding="utf-8")).get("records") or []
+            for r in ipo_recs:
+                comp = (r.get("company") or "").strip()
+                sponsors = r.get("sponsors") or []
+                sponsor = sponsors[0] if sponsors else ""
+                if comp:
+                    if comp not in by_full or not by_full[comp][1]:
+                        by_full[comp] = (comp, sponsor)
+                    all_entries.append((comp, sponsor))
+        except Exception:
+            pass
+
+    return by_abbr, by_full, all_entries
+
+
+def match_enrichment(abbr, company, by_abbr, by_full, all_entries):
+    if company in by_full and by_full[company][1]:
+        return by_full[company]
+    if abbr in by_abbr:
+        return by_abbr[abbr]
+    # 去掉“股份”“科技”“新材”等后缀做子串匹配（如“华晟智能”匹配“江苏华晟智能...”或“菊乐股份”匹配“四川菊乐食品...”）
+    clean_abbr = re.sub(r"股份$|科技$|集团$|新材$|智能$|电子$|医药$", "", abbr or "").strip()
+    if len(clean_abbr) >= 2:
+        for comp, sponsor in all_entries:
+            if clean_abbr in comp:
+                return comp, sponsor
+    return company, ""
+
+
+def fetch_issuance_records(data_dir, committee_records):
+    """采集 2023-01-01 至今的沪深北新股发行动态，并补全北交所募资额、主承销商与公司全称。"""
     today = datetime.now().strftime("%Y-%m-%d")
+    by_abbr, by_full, all_entries = build_bse_enrichment_maps(data_dir, committee_records)
     records = []
     page = 1
     while page <= 8:
@@ -206,32 +258,52 @@ def fetch_issuance_records():
             else:
                 issue_status = "待上市"
 
+            issue_price = safe_float(row.get("ISSUE_PRICE"), 2)
+            issue_num_wan = safe_float(row.get("TOTAL_ISSUE_NUM") or row.get("ISSUE_NUM"), 4)
+
+            # 募资金额（亿元）：兼容沪深 TOTAL_RAISE_FUNDS 与北交所 DEC_SUMFINA / 发行价×发行股数
             raise_yi = safe_float(row.get("TOTAL_RAISE_FUNDS"), 2)
-            if raise_yi is None:
-                pred = safe_float(row.get("PREDICT_RAISE_FUNDS"), 2)
-                raise_yi = round(pred / 1e8, 2) if pred and pred > 1e4 else pred
-            elif raise_yi > 1e4:
+            if raise_yi is not None and raise_yi > 1e4:
                 raise_yi = round(raise_yi / 1e8, 2)
+            if raise_yi is None:
+                for col in ("DEC_SUMFINA", "NETSUMFINA", "PREDICT_RAISE_FUNDS"):
+                    val = safe_float(row.get(col), 2)
+                    if val and val > 0:
+                        raise_yi = round(val / 1e8, 2) if val > 1e4 else val
+                        break
+            if raise_yi is None and issue_price and issue_num_wan:
+                raise_yi = round((issue_price * issue_num_wan) / 10000.0, 2)
 
             # 首日涨跌幅
             first_day_chg = safe_float(row.get("LD_CLOSE_CHANGE"), 2)
             if first_day_chg is None:
                 first_day_chg = safe_float(row.get("LD_OPEN_PREMIUM"), 2)
 
-            # 承销商
+            abbr = (row.get("SECURITY_NAME") or row.get("SECURITY_NAME_ABBR") or "").strip()
+            company = (row.get("SECURITY_NAME_FULL") or "").strip()
             underwriter = normalize_org(row.get("RECOMMEND_ORG") or row.get("UNDERWRITER_ORG") or "")
+
+            # 对缺失全称或主承销商的项目（尤其是北交所），交叉关联补齐
+            if not underwriter or not company:
+                en_comp, en_sponsor = match_enrichment(abbr, company, by_abbr, by_full, all_entries)
+                if not company and en_comp:
+                    company = en_comp
+                if not underwriter and en_sponsor:
+                    underwriter = en_sponsor
+            if not company:
+                company = abbr
 
             records.append({
                 "id": str(row.get("INFO_CODE") or code or f"ISS-{len(records)+1}"),
                 "security_code": code,
-                "abbr": (row.get("SECURITY_NAME") or row.get("SECURITY_NAME_ABBR") or "").strip(),
-                "company": (row.get("SECURITY_NAME_FULL") or row.get("SECURITY_NAME") or "").strip(),
+                "abbr": abbr,
+                "company": company,
                 "board": board,
                 "exchange": exchange,
                 "status": issue_status,
                 "apply_date": apply_dt,
                 "listing_date": listing_dt,
-                "issue_price": safe_float(row.get("ISSUE_PRICE"), 2),
+                "issue_price": issue_price,
                 "issue_pe": safe_float(row.get("AFTER_ISSUE_PE"), 2),
                 "industry_pe": safe_float(row.get("INDUSTRY_PE") or row.get("INDUSTRY_PE_NEW"), 2),
                 "lwr_pct": safe_float(row.get("ONLINE_ISSUE_LWR"), 4),
@@ -291,7 +363,7 @@ def main():
         sys.exit(1)
 
     try:
-        issuance = fetch_issuance_records()
+        issuance = fetch_issuance_records(data_dir, committee)
         if issuance:
             write_pair(data_dir, "issuance_data", "__ISSUANCE_DATA__", issuance)
     except Exception as exc:
