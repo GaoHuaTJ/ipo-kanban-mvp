@@ -87,6 +87,7 @@
     currentDetailRec: null,
     activeTab: "全景图",
     previousTab: "审核动态",
+    overviewBoard: "全部",
     mapMode: "heatmap",
     rightOrgType: "law",
     mergeOrgHQ: true,     // 全景图口径优化：默认合并分所至总所
@@ -333,11 +334,47 @@
     return false;
   }
 
+  function getOverviewActiveRecords() {
+    if (state.overviewBoard === "全部") return state.activeRecords;
+    return state.activeRecords.filter((r) => r.board === state.overviewBoard);
+  }
+
+  function updateOverviewBoardCounts() {
+    const counts = {};
+    for (const r of state.activeRecords) {
+      counts[r.board] = (counts[r.board] || 0) + 1;
+    }
+    document.querySelectorAll("#overview-board-switch .chip-btn").forEach((btn) => {
+      const v = btn.dataset.val;
+      if (v === "全部") {
+        btn.innerHTML = `全部<span class="chip-count">(${state.activeRecords.length})</span>`;
+      } else {
+        btn.innerHTML = `${v}<span class="chip-count">(${counts[v] || 0})</span>`;
+      }
+    });
+  }
+
   function updateHeaderMeta() {
     const meta = state.meta || {};
     const activeTotal = state.activeRecords.length;
     const allTotal = state.records.length;
-    $("overview-date-text").textContent = `截止：${meta.update_date || "-"}  A股IPO在审`;
+    const bd = state.overviewBoard;
+    const scopedTotal = getOverviewActiveRecords().length;
+
+    $("overview-date-text").textContent = bd === "全部"
+      ? "A股IPO在审"
+      : `A股IPO在审 · ${bd}（${scopedTotal} 家）`;
+    if ($("overview-sponsor-title")) {
+      $("overview-sponsor-title").textContent = bd === "全部"
+        ? "A股IPO在审（保荐机构）"
+        : `${bd}在审（保荐机构）`;
+    }
+    if ($("overview-right-org-title")) {
+      $("overview-right-org-title").textContent = bd === "全部"
+        ? "A股IPO在审"
+        : `${bd}在审`;
+    }
+
     const isDemo = meta.data_source === "demo_snapshot";
     $("source-dot").className = isDemo ? "source-dot demo" : "source-dot";
     $("source-text").textContent = isDemo
@@ -380,7 +417,7 @@
 
   function getOrgStats(field, topN = 15) {
     const map = {};
-    for (const r of state.activeRecords) {
+    for (const r of getOverviewActiveRecords()) {
       const seenInRecord = new Set();
       for (const rawOrg of r[field] || []) {
         if (!rawOrg) continue;
@@ -397,6 +434,10 @@
   }
 
   function renderMatrix() {
+    document.querySelectorAll(".matrix-board-th").forEach((th) => {
+      th.classList.toggle("matrix-col-active", th.dataset.board === state.overviewBoard);
+    });
+
     const counts = {};
     for (const st of STAGES) {
       counts[st] = {};
@@ -424,9 +465,10 @@
         rowSum += val;
         colTotals[bd] += val;
         grandTotal += val;
+        const colCls = bd === state.overviewBoard ? ` class="matrix-col-active"` : "";
         html += val > 0
-          ? `<td><span class="matrix-num clickable" data-board="${bd}" data-stage="${st}" title="查看 ${bd} · ${st}">${val}</span></td>`
-          : `<td><span class="matrix-num zero">0</span></td>`;
+          ? `<td${colCls}><span class="matrix-num clickable" data-board="${bd}" data-stage="${st}" title="查看 ${bd} · ${st}">${val}</span></td>`
+          : `<td${colCls}><span class="matrix-num zero">0</span></td>`;
       }
       html += rowSum > 0
         ? `<td><span class="matrix-num clickable" data-board="全部" data-stage="${st}" title="查看全部 ${st}">${rowSum}</span></td>`
@@ -438,7 +480,8 @@
     const totalTr = document.createElement("tr");
     let totalHtml = `<td>合计</td>`;
     for (const bd of BOARDS) {
-      totalHtml += `<td><span class="matrix-num clickable" data-board="${bd}" data-stage="在审汇总" title="查看 ${bd} 全部在审">${colTotals[bd]}</span></td>`;
+      const colCls = bd === state.overviewBoard ? ` class="matrix-col-active"` : "";
+      totalHtml += `<td${colCls}><span class="matrix-num clickable" data-board="${bd}" data-stage="在审汇总" title="查看 ${bd} 全部在审">${colTotals[bd]}</span></td>`;
     }
     totalHtml += `<td><span class="matrix-num clickable" data-board="全部" data-stage="在审汇总" title="查看全部在审企业">${grandTotal}</span></td>`;
     totalTr.innerHTML = totalHtml;
@@ -469,12 +512,12 @@
       mapChart.on("click", (params) => {
         const prov = params.name;
         if (prov && PROVINCE_COORDS[prov]) {
-          jumpToDynamics({ exchange: "全部", board: "全部", stage: "在审汇总", province: prov, keyword: "" });
+          jumpToDynamics({ exchange: "全部", board: state.overviewBoard, stage: "在审汇总", province: prov, keyword: "" });
         }
       });
     }
 
-    const stats = getProvinceStats(state.activeRecords);
+    const stats = getProvinceStats(getOverviewActiveRecords());
 
     if (state.mapMode === "heatmap") {
       const ok = await ensureChinaGeoJson();
@@ -631,11 +674,11 @@
 
   function renderOrgCharts() {
     sponsorChart = renderRankChart(sponsorChart, "sponsor-chart", getOrgStats("sponsors", 15), (org) => {
-      jumpToDynamics({ exchange: "全部", board: "全部", stage: "在审汇总", province: "全部", keyword: extractOrgSearchKeyword(org) });
+      jumpToDynamics({ exchange: "全部", board: state.overviewBoard, stage: "在审汇总", province: "全部", keyword: extractOrgSearchKeyword(org) });
     });
     const rightField = state.rightOrgType === "law" ? "law_firms" : "accounting_firms";
     rightOrgChart = renderRankChart(rightOrgChart, "right-org-chart", getOrgStats(rightField, 15), (org) => {
-      jumpToDynamics({ exchange: "全部", board: "全部", stage: "在审汇总", province: "全部", keyword: extractOrgSearchKeyword(org) });
+      jumpToDynamics({ exchange: "全部", board: state.overviewBoard, stage: "在审汇总", province: "全部", keyword: extractOrgSearchKeyword(org) });
     });
   }
 
@@ -2153,6 +2196,30 @@
       });
     });
 
+    const setOverviewBoard = (board) => {
+      state.overviewBoard = board || "全部";
+      document.querySelectorAll("#overview-board-switch .chip-btn").forEach((b) => {
+        b.classList.toggle("active", b.dataset.val === state.overviewBoard);
+      });
+      updateHeaderMeta();
+      renderMatrix();
+      renderOrgCharts();
+      renderMapOrBar();
+    };
+
+    document.querySelectorAll("#overview-board-switch .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        setOverviewBoard(btn.dataset.val);
+      });
+    });
+
+    document.querySelectorAll(".matrix-board-th").forEach((th) => {
+      th.addEventListener("click", () => {
+        const bd = th.dataset.board;
+        setOverviewBoard(state.overviewBoard === bd ? "全部" : bd);
+      });
+    });
+
     document.querySelectorAll("#map-mode-switch .seg-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         state.mapMode = btn.dataset.mode;
@@ -2554,6 +2621,7 @@
       state.tutoringRecords = (tutPayload && tutPayload.records) || [];
       state.neeqRecords = (neeqPayload && neeqPayload.records) || [];
 
+      updateOverviewBoardCounts();
       updateHeaderMeta();
       renderMatrix();
       updateFilterChipCounts();

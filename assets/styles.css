@@ -303,7 +303,15 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 22px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.overview-board-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
   flex-wrap: wrap;
 }
 
@@ -432,6 +440,25 @@ body {
   font-weight: 600;
   padding: 14px 10px;
   border-bottom: 1px solid var(--border-light);
+}
+
+.matrix-board-th {
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.matrix-board-th:hover {
+  color: var(--g-blue);
+  background: #f0f6ff;
+}
+
+.matrix-table th.matrix-col-active {
+  background: #e8f0fe;
+  color: var(--g-blue);
+}
+
+.matrix-table td.matrix-col-active {
+  background: #f5f9ff;
 }
 
 .matrix-table tbody td {

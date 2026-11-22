@@ -103,9 +103,21 @@
       </div>
 
       <div id="ashare-overview-content">
+        <div class="overview-board-row">
+          <span class="market-label">板块：</span>
+          <div id="overview-board-switch" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="沪主板">沪主板</button>
+            <button class="chip-btn" data-val="科创板">科创板</button>
+            <button class="chip-btn" data-val="深主板">深主板</button>
+            <button class="chip-btn" data-val="创业板">创业板</button>
+            <button class="chip-btn" data-val="北证">北证</button>
+          </div>
+        </div>
+
         <div class="section-header">
           <div class="section-title-left">
-            <h2 id="overview-date-text" class="section-title">截止：-- A股IPO在审</h2>
+            <h2 id="overview-date-text" class="section-title">A股IPO在审</h2>
             <div id="map-mode-switch" class="segmented-group">
               <button class="seg-btn active" data-mode="heatmap">热力图</button>
               <button class="seg-btn" data-mode="bar">柱状图</button>
@@ -126,11 +138,11 @@
               <thead>
                 <tr>
                   <th>审核阶段</th>
-                  <th>沪主板</th>
-                  <th>科创板</th>
-                  <th>深主板</th>
-                  <th>创业板</th>
-                  <th>北证</th>
+                  <th class="matrix-board-th" data-board="沪主板" title="点击按沪主板筛选全景图">沪主板</th>
+                  <th class="matrix-board-th" data-board="科创板" title="点击按科创板筛选全景图">科创板</th>
+                  <th class="matrix-board-th" data-board="深主板" title="点击按深主板筛选全景图">深主板</th>
+                  <th class="matrix-board-th" data-board="创业板" title="点击按创业板筛选全景图">创业板</th>
+                  <th class="matrix-board-th" data-board="北证" title="点击按北证筛选全景图">北证</th>
                   <th>合计</th>
                 </tr>
               </thead>
@@ -147,7 +159,7 @@
         <div class="overview-bottom-grid">
           <div class="panel-card">
             <div class="panel-card-header">
-              <h3 class="section-title">A股IPO在审（保荐机构）</h3>
+              <h3 id="overview-sponsor-title" class="section-title">A股IPO在审（保荐机构）</h3>
               <span class="data-hint">TOP 15 · 含联合保荐</span>
             </div>
             <div id="sponsor-chart" class="chart-canvas-rank"></div>
@@ -155,7 +167,7 @@
 
           <div class="panel-card">
             <div class="panel-card-header">
-              <h3 class="section-title">A股IPO在审</h3>
+              <h3 id="overview-right-org-title" class="section-title">A股IPO在审</h3>
               <div class="header-controls-right">
                 <div class="radio-group">
                   <label class="radio-label">
