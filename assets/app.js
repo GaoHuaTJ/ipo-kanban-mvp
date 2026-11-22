@@ -2415,6 +2415,58 @@
       if (sponsorChart) sponsorChart.resize();
       if (rightOrgChart) rightOrgChart.resize();
     });
+
+    initMobileFilterCollapsers();
+  }
+
+  function initMobileFilterCollapsers() {
+    document.querySelectorAll(".filter-minimal").forEach((box) => {
+      if (box.previousElementSibling && box.previousElementSibling.classList.contains("mobile-filter-toggle")) {
+        return;
+      }
+      box.classList.add("mobile-collapsed");
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "mobile-filter-toggle";
+      btn.setAttribute("aria-expanded", "false");
+      btn.innerHTML = `
+        <span class="mobile-filter-toggle-left">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+          <span>筛选条件</span>
+        </span>
+        <span class="mobile-filter-summary">
+          <span class="mobile-filter-summary-text">默认全部</span>
+          <span class="mobile-filter-arrow">展开 ∨</span>
+        </span>`;
+
+      const summaryEl = btn.querySelector(".mobile-filter-summary-text");
+      const arrowEl = btn.querySelector(".mobile-filter-arrow");
+
+      const refreshSummary = () => {
+        const picked = [];
+        box.querySelectorAll(".chip-btn.active").forEach((chip) => {
+          const val = chip.dataset.val;
+          if (val && val !== "全部") {
+            const label = val === "older" ? "2022及以前" : val;
+            picked.push(label);
+          }
+        });
+        summaryEl.textContent = picked.length ? `已选 ${picked.length} 项 · ${picked.join("、")}` : "默认全部";
+      };
+
+      btn.addEventListener("click", () => {
+        const collapsed = box.classList.toggle("mobile-collapsed");
+        btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        arrowEl.textContent = collapsed ? "展开 ∨" : "收起 ∧";
+      });
+
+      const observer = new MutationObserver(refreshSummary);
+      observer.observe(box, { subtree: true, attributes: true, attributeFilter: ["class"], childList: true });
+      refreshSummary();
+
+      box.parentNode.insertBefore(btn, box);
+    });
   }
 
   async function init() {
