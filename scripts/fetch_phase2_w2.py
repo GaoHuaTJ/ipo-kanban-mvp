@@ -30,6 +30,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
+from broker_utils import normalize_broker
+
 try:
     import pypdf
     logging.getLogger("pypdf").setLevel(logging.ERROR)
@@ -123,20 +125,6 @@ def normalize_name(name):
         .replace(" ", "")
         .replace("\u3000", "")
     )
-
-
-def normalize_broker(raw):
-    if not raw:
-        return ""
-    s = str(raw).strip()
-    s = re.sub(r"[（(]以下简称.*?[）)]", "", s)
-    s = re.sub(r"股份有限公司$|有限责任公司$|有限公司$", "", s).strip()
-    s = s.replace("证券承销保荐", "证券").strip()
-    if s == "中国国际金融":
-        return "中金公司"
-    if s == "华泰联合证券":
-        return "华泰联合"
-    return s
 
 
 def shorten_law_firm(raw):
@@ -468,7 +456,7 @@ def _parse_csrc_page_rows(page_html):
             current_rec = {
                 "company": company,
                 "sponsor": sponsor or "—",
-                "sponsor_full": sponsor_full or sponsor or "—",
+                "sponsor_full": sponsor or "—",
                 "record_date": record_date or "—",
                 "status": status,
                 "bureau": bureau or "—",

@@ -17,6 +17,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
+from broker_utils import normalize_broker
+
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -100,10 +102,7 @@ def normalize_review_result(raw):
 
 
 def normalize_org(raw):
-    if not raw:
-        return ""
-    s = re.sub(r"股份有限公司$|有限责任公司$|有限公司$", "", str(raw).strip())
-    return s.replace("证券承销保荐", "证券").strip()
+    return normalize_broker(raw)
 
 
 def fetch_committee_records():

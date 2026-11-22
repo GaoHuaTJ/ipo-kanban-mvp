@@ -159,6 +159,94 @@
       .replace(/"/g, "&quot;");
   }
 
+  const BROKER_ALIAS_MAP = {
+    "中国国际金融": "中金公司",
+    "中国国际金融证券": "中金公司",
+    "中金": "中金公司",
+    "中金公司": "中金公司",
+    "中信建投证券": "中信建投",
+    "中信建投": "中信建投",
+    "华泰联合证券": "华泰联合",
+    "华泰联合": "华泰联合",
+    "华泰证券": "华泰证券",
+    "国泰海通证券": "国泰海通",
+    "国泰海通": "国泰海通",
+    "国泰君安证券": "国泰君安",
+    "国泰君安": "国泰君安",
+    "国联民生证券": "国联民生",
+    "国联民生": "国联民生",
+    "申万宏源证券": "申万宏源",
+    "申万宏源": "申万宏源",
+    "第一创业证券": "第一创业",
+    "第一创业": "第一创业",
+    "中国银河证券": "银河证券",
+    "中国银河": "银河证券",
+    "银河证券": "银河证券",
+    "中银国际证券": "中银证券",
+    "中银国际": "中银证券",
+    "中银证券": "中银证券",
+    "东亚前海证券": "东亚前海",
+    "东亚前海": "东亚前海",
+    "东方花旗证券": "东方花旗",
+    "东方花旗": "东方花旗",
+    "中国民族证券": "民族证券",
+    "民族证券": "民族证券",
+    "中天国富证券": "中天国富",
+    "中天国富": "中天国富",
+    "恒泰长财证券": "恒泰长财",
+    "恒泰长财": "恒泰长财",
+    "瑞信方正证券": "瑞信方正",
+    "瑞信方正": "瑞信方正",
+    "瑞信证券": "瑞信证券",
+    "大和证券": "大和证券",
+    "金圆统一证券": "金圆统一",
+    "金圆统一": "金圆统一",
+    "长城国瑞证券": "长城国瑞",
+    "长城国瑞": "长城国瑞",
+    "高盛高华证券": "高盛高华",
+    "高盛高华": "高盛高华",
+    "高盛证券": "高盛中国",
+    "高盛中国": "高盛中国",
+    "汇丰前海证券": "汇丰前海",
+    "汇丰前海": "汇丰前海",
+    "野村东方国际证券": "野村东方",
+    "野村东方": "野村东方",
+    "摩根大通证券": "摩根大通",
+    "摩根大通": "摩根大通",
+    "摩根士丹利华鑫证券": "摩根士丹利",
+    "摩根士丹利证券": "摩根士丹利",
+    "摩根士丹利": "摩根士丹利",
+    "东方": "东方证券",
+    "方正": "方正证券",
+    "长江": "长江证券",
+    "太平洋": "太平洋证券",
+    "太平洋证券": "太平洋证券",
+  };
+
+  function normalizeBrokerName(raw) {
+    const txt = String(raw || "").trim();
+    if (!txt || txt === "—" || txt === "-" || txt === "--" || txt === "无") return txt || "—";
+    const parts = txt.split(/[,，、;；]+/).map((p) => p.trim()).filter(Boolean);
+    const out = [];
+    const seen = new Set();
+    for (const part of parts) {
+      let s = part.replace(/[（(]以下.*?[）)]/g, "").replace(/\s+/g, "").replace(/\(/g, "（").replace(/\)/g, "）");
+      s = s.replace(/证券承销保荐(?:有限责任公司|有限公司)?/g, "证券");
+      s = s.replace(/(?:保荐有限责任公司|股份有限公司|有限责任公司|有限公司)$/g, "");
+      s = s.replace(/[（(](?:中国|亚洲|上海|深圳|北京)[）)]$/g, "").trim();
+      let mapped = BROKER_ALIAS_MAP[s] || s;
+      if (mapped.length === 6 && mapped.endsWith("证券") && mapped !== "太平洋证券") {
+        const core = mapped.slice(0, -2);
+        mapped = BROKER_ALIAS_MAP[core] || core;
+      }
+      if (mapped && !seen.has(mapped)) {
+        seen.add(mapped);
+        out.push(mapped);
+      }
+    }
+    return out.length ? out.join("、") : txt;
+  }
+
   async function loadJsonWithFallback(url, fallbackData) {
     try {
       const resp = await fetch(url, { cache: "no-cache" });
@@ -781,7 +869,7 @@
       ["行业市盈率", iss.industry_pe !== null ? `${iss.industry_pe.toFixed(2)} 倍` : "—", false],
       ["网上中签率", iss.lwr_pct !== null ? `${iss.lwr_pct.toFixed(4)}%` : "—", false],
       ["上市首日涨跌幅", chgText, true],
-      ["主承销商", iss.underwriter || "—", false],
+      ["主承销商", normalizeBrokerName(iss.underwriter) || "—", false],
       ["发行方式", iss.issue_way || "—", false],
     ];
 
@@ -842,7 +930,7 @@
       industry: rec.industry,
       province: rec.province,
       plan_raise_yi: "实时获取中...",
-      sponsor: (rec.sponsors || []).join("、") || "—",
+      sponsor: normalizeBrokerName((rec.sponsors || []).join("、")) || "—",
       sponsor_reps: "实时获取中...",
       accounting_firm: (rec.accounting_firms || []).join("、") || "—",
       accountants: "实时获取中...",
@@ -912,7 +1000,7 @@
       industry: live.industry && live.industry !== "—" ? live.industry : rec.industry,
       province: live.province && live.province !== "—" ? live.province : rec.province,
       plan_raise_yi: live.plan_raise_yi || "暂无数据",
-      sponsor: live.sponsor && live.sponsor !== "—" ? live.sponsor : (rec.sponsors || []).join("、"),
+      sponsor: normalizeBrokerName(live.sponsor && live.sponsor !== "—" ? live.sponsor : (rec.sponsors || []).join("、")),
       sponsor_reps: live.sponsor_reps || "—",
       accounting_firm: live.accounting_firm && live.accounting_firm !== "—" ? live.accounting_firm : (rec.accounting_firms || []).join("、"),
       accountants: live.accountants || "—",
@@ -1589,7 +1677,7 @@
 
     const items = [
       ["成立时间", valOrFallback(rec.founded_date, fallbackText)],
-      ["辅导券商", rec.sponsor_full || rec.sponsor || "—"],
+      ["辅导券商", normalizeBrokerName(rec.sponsor || rec.sponsor_full) || "—"],
       ["注册地址", valOrFallback(rec.reg_address, fallbackText)],
       ["律师事务所", valOrFallback(rec.law_firm, fallbackText)],
       ["注册资本", valOrFallback(rec.reg_capital, fallbackText)],

@@ -19,6 +19,8 @@ import urllib.parse
 import urllib.request
 from datetime import datetime
 
+from broker_utils import normalize_broker_list
+
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -231,7 +233,7 @@ def fetch_from_eastmoney():
                 "raw_status": str(raw_status).strip(),
                 "province": normalize_province(row.get("REG_ADDRESS") or row.get("REGISTER_ADDRESS") or ""),
                 "industry": (row.get("CSRC_INDUSTRY") or row.get("INDUSTRY") or "其他").strip(),
-                "sponsors": normalize_org_list(row.get("RECOMMEND_ORG") or ""),
+                "sponsors": normalize_broker_list([row.get("RECOMMEND_ORG") or ""]),
                 "law_firms": normalize_org_list(row.get("LAW_FIRM") or ""),
                 "accounting_firms": normalize_org_list(row.get("ACCOUNT_FIRM") or ""),
                 "accept_date": safe_date(row.get("ACCEPT_DATE")),
