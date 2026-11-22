@@ -2028,6 +2028,7 @@
 
   function switchSubTab(tabName) {
     state.activeTab = tabName;
+    if ($("active-subtab-pill")) $("active-subtab-pill").textContent = tabName;
     $("view-detail").classList.add("hidden");
     $("view-tutoring-detail").classList.add("hidden");
     document.querySelectorAll(".sub-tab").forEach((btn) => {

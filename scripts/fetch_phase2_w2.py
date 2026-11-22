@@ -22,8 +22,11 @@ import json
 import logging
 import os
 import re
+import shutil
 import ssl
+import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.parse
@@ -39,6 +42,49 @@ except ImportError:
     pypdf = None
 
 CSRC_PRE_IPO_PREFIX = "http://eid.csrc.gov.cn/mnt/storage/stock/pre_ipo/"
+_OCR_BIN_PATH = "/tmp/ipo_pdf_ocr_bin"
+_OCR_SWIFT_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pdf_ocr.swift")
+
+
+def ensure_macos_ocr_bin():
+    """仅在 macOS 且具备 swiftc 时编译缓存 Vision OCR 工具，Linux/CI 环境自动跳过。"""
+    if sys.platform != "darwin" or not os.path.exists(_OCR_SWIFT_PATH):
+        return None
+    if os.path.exists(_OCR_BIN_PATH) and os.path.getmtime(_OCR_BIN_PATH) >= os.path.getmtime(_OCR_SWIFT_PATH):
+        return _OCR_BIN_PATH
+    if not shutil.which("swiftc"):
+        return None
+    try:
+        res = subprocess.run(
+            ["swiftc", "-O", _OCR_SWIFT_PATH, "-o", _OCR_BIN_PATH],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if res.returncode == 0 and os.path.exists(_OCR_BIN_PATH):
+            return _OCR_BIN_PATH
+    except Exception:
+        pass
+    return None
+
+
+def run_macos_pdf_ocr(pdf_bytes, max_pages=3):
+    bin_path = ensure_macos_ocr_bin()
+    if not bin_path or not pdf_bytes:
+        return ""
+    fd, tmp_path = tempfile.mkstemp(suffix=".pdf")
+    try:
+        with os.fdopen(fd, "wb") as tf:
+            tf.write(pdf_bytes)
+        res = subprocess.run([bin_path, tmp_path, str(max_pages)], capture_output=True, text=True, timeout=35)
+        return (res.stdout or "").strip() if res.returncode == 0 else ""
+    except Exception:
+        return ""
+    finally:
+        try:
+            os.remove(tmp_path)
+        except OSError:
+            pass
 
 
 def company_shard(company):
@@ -75,15 +121,17 @@ KNOWN_LAW_ROOTS = [
     "启元", "天禾", "德和衡", "泰和泰", "广发", "段和段", "金诚同达", "隆安",
     "浩天", "万商天勤", "卓纬", "嘉润", "国枫", "天达共和", "君泽君", "星来",
     "安杰世泽", "金天", "大钧", "高朋", "众成清泰", "瑛明", "通力", "澄明则正",
+    "道可特", "天衍禾", "天衡联合", "卓建", "经世", "中闻", "天驰君泰", "炜衡",
+    "盈科", "汇业",
 ]
 
 KNOWN_ACCT_ROOTS = [
     "毕马威华振", "毕马威", "普华永道中天", "普华永道", "安永华明", "安永",
     "德勤华永", "德勤", "天健", "容诚", "立信中联", "立信", "致同",
     "信永中和", "大华", "大信", "中汇", "中喜", "公证天业", "天职国际",
-    "中审众环", "中审亚太", "中天运", "上会", "苏亚金诚", "希格玛",
+    "中审众环", "中审亚太", "中审华", "中天运", "上会", "苏亚金诚", "希格玛",
     "政旦志远", "利安达", "鹏盛", "北京兴华", "中兴华", "中兴财光华",
-    "众华", "天衡", "天圆全", "亚太", "华兴", "尤尼泰振青",
+    "众华", "天衡", "天圆全", "亚太", "华兴", "尤尼泰振青", "中名国成", "和信",
 ]
 
 PROVINCE_PREFIXES = (
@@ -163,11 +211,33 @@ def shorten_acct_firm(raw):
             if root.startswith("德勤"):
                 return "德勤"
             return root
-    core = re.sub(r"[（(]特殊普通合伙[）)]|[（(]普通合伙[）)]|[（(]集团[）)]", "", s)
+    core = re.sub(r"[（(]特殊普通合伙[）)]|[（(]特?普通合伙[）)]?|[（(]集团[）)]|[（(]特.*", "", s)
     core = re.sub(r"(?:股份有限公司|有限责任公司|有限公司)$", "", core)
     core = re.sub(r"(?:会计师)?事务所$", "", core)
     core = re.sub(r"会计师$", "", core)
     return core or s[:8]
+
+
+def _is_valid_law_firm(s):
+    if not s or len(s) < 5:
+        return False
+    bad_kws = ("证券", "金融", "辅导", "服务机构", "执业", "配合开展", "会计师", "监管局", "交易所")
+    if any(k in s for k in bad_kws):
+        return False
+    short = shorten_law_firm(s)
+    return len(short) >= 2 and "律师" not in short and "事务所" not in short
+
+
+def _is_valid_acct_firm(s):
+    if not s or len(s) < 6:
+        return False
+    bad_kws = ("证券", "金融", "辅导", "服务机构", "执业", "配合开展", "律师", "监管局", "交易所")
+    if any(k in s for k in bad_kws):
+        return False
+    if s.startswith(("（", "(")):
+        return False
+    short = shorten_acct_firm(s)
+    return len(short) >= 2 and "会计师" not in short and "事务所" not in short and "普通合伙" not in short
 
 
 def safe_float(val, digits=2):
@@ -224,27 +294,36 @@ def clean_pdf_value(val):
     return s.strip(" ：:;；")
 
 
-def extract_profile_from_pdf_bytes(pdf_bytes, report_title="", is_filing_report=True):
-    """使用 pypdf 从证监会辅导备案报告/进展报告 PDF 提取结构化基本面与中介字段。"""
+def extract_profile_from_pdf_bytes(pdf_bytes, report_title="", is_filing_report=True, allow_ocr=True):
+    """从证监会辅导备案报告/进展报告 PDF 提取结构化基本面与中介字段（支持 macOS Vision OCR 兜底）。"""
     profile = {}
-    if pypdf is None or not pdf_bytes:
+    if not pdf_bytes:
         return profile
 
-    try:
-        reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
-    except Exception:
-        return profile
-
-    pages_txt = []
-    for i in range(min(5, len(reader.pages))):
+    raw_text = ""
+    if pypdf is not None:
         try:
-            t = reader.pages[i].extract_text() or ""
-            if t.strip():
-                pages_txt.append(t)
+            reader = pypdf.PdfReader(io.BytesIO(pdf_bytes))
+            pages_txt = []
+            for i in range(min(5, len(reader.pages))):
+                try:
+                    t = reader.pages[i].extract_text() or ""
+                    if t.strip():
+                        pages_txt.append(t)
+                except Exception:
+                    continue
+            raw_text = "\n".join(pages_txt).strip()
         except Exception:
-            continue
+            raw_text = ""
 
-    raw_text = "\n".join(pages_txt).strip()
+    # 扫描版 PDF 或局部含扫描页且未见中介/基本面关键字时，macOS 下用 Vision OCR 识别
+    if allow_ocr and (len(raw_text) < 20 or (is_filing_report and "律师事务所" not in raw_text and "会计师事务所" not in raw_text)):
+        ocr_text = run_macos_pdf_ocr(pdf_bytes, max_pages=3)
+        if len(ocr_text) > len(raw_text):
+            raw_text = ocr_text
+        elif ocr_text:
+            raw_text = raw_text + "\n" + ocr_text
+
     if len(raw_text) < 20:
         return profile
 
@@ -292,23 +371,36 @@ def extract_profile_from_pdf_bytes(pdf_bytes, report_title="", is_filing_report=
 
         ind = grab(
             r"(?:行\s*业\s*分\s*类|所\s*属\s*行\s*业)",
-            r"在\s*其\s*他\s*交\s*易\s*场\s*所|备\s*注|前\s*次\s*申\s*报|二\s*[、.]\s*辅\s*导",
+            r"所\s*[（(]?\s*申\s*请\s*[）)]?\s*挂\s*牌|在\s*其\s*他\s*交\s*易\s*场|备\s*注|前\s*次\s*申\s*报|二\s*[、.]\s*辅\s*导",
             80,
         )
         if ind:
-            profile["industry"] = ind
+            profile["industry"] = re.sub(r"\s*(?:在\s*其\s*他\s*交\s*易\s*场.*|所\s*[（(]申\s*请.*)$", "", ind).strip()
 
         neeq_txt = grab(
-            r"在\s*其\s*他\s*交\s*易\s*场\s*所\s*[（(]?\s*申\s*请\s*[）)]?\s*挂\s*牌\s*或\s*上\s*市\s*的\s*情\s*况",
+            r"(?:在\s*其\s*他\s*交\s*易\s*场\s*所\s*)?[（(]?\s*申\s*请\s*[）)]?\s*挂\s*牌(?:\s*或\s*上\s*市\s*的\s*情\s*况)?",
             r"备\s*注|前\s*次\s*申\s*报|二\s*[、.]\s*辅\s*导|阶\s*段\s*辅\s*导|[\u4e00-\u9fa5]{2,16}(?:证券|金融)股份有限公司",
             220,
         )
         if neeq_txt:
-            profile["neeq_status"] = neeq_txt
+            neeq_clean = re.sub(r"^(?:或上市的?情况\s*)+", "", neeq_txt)
+            neeq_clean = re.sub(r"(?:\s*或上市的?情况)+$", "", neeq_clean).strip()
+            if neeq_clean == "或上市的情况":
+                neeq_clean = ""
+            if neeq_clean:
+                profile["neeq_status"] = neeq_clean
 
         remark = grab(r"备\s*注", r"二\s*[、.]\s*辅\s*导|阶\s*段\s*辅\s*导", 240)
         if remark:
-            if remark == "无" or "不存在" in remark or "未曾" in remark:
+            if (
+                remark == "无"
+                or "不存在" in remark
+                or "未曾" in remark
+                or "不适用" in remark
+                or "不予核准" in remark
+                or "不予注册" in remark
+                or remark.startswith("止审查")
+            ):
                 profile["prev_filing"] = "无"
             else:
                 profile["prev_filing"] = remark
@@ -319,37 +411,40 @@ def extract_profile_from_pdf_bytes(pdf_bytes, report_title="", is_filing_report=
 
         law_raw = grab(
             r"律\s*师\s*事\s*务\s*所",
-            r"会\s*计\s*师\s*事\s*务\s*所|签\s*字\s*律\s*师|三\s*[、.]\s*辅\s*导|辅\s*导\s*工\s*作|辅\s*导\s*小\s*组",
+            r"会\s*计\s*师\s*事\s*务|签\s*字\s*律\s*师|三\s*[、.]\s*辅\s*导|辅\s*导\s*工\s*作|辅\s*导\s*小\s*组",
             90,
         )
         if law_raw:
             law_clean = re.sub(r"[（(]以下.*?[）)].*$", "", law_raw).strip()
-            if "事务所" in law_clean or len(law_clean) >= 2:
+            m_lf_end = re.match(r"^(.*?律师事务所(?:[（(][^）)]*[）)])?)", law_clean)
+            if m_lf_end:
+                law_clean = m_lf_end.group(1)
+            if _is_valid_law_firm(law_clean):
                 profile["law_firm"] = law_clean
                 profile["law_firm_short"] = shorten_law_firm(law_clean)
 
         acct_raw = grab(
-            r"会\s*计\s*师\s*事\s*务\s*所",
+            r"会\s*计\s*师\s*事\s*务\s*所?",
             r"三\s*[、.]\s*辅\s*导|辅\s*导\s*工\s*作|签\s*字\s*会\s*计\s*师|其\s*他\s*中\s*介|时\s*间\s*辅\s*导",
             90,
         )
         if acct_raw:
             acct_clean = re.sub(r"[（(]以下.*?[）)].*$", "", acct_raw).strip()
-            if "事务所" in acct_clean or len(acct_clean) >= 2:
+            if "会计师事务所" in acct_clean and _is_valid_acct_firm(acct_clean):
                 profile["acct_firm"] = acct_clean
                 profile["acct_firm_short"] = shorten_acct_firm(acct_clean)
 
     # 兜底：若第 2 页恰好为图片扫描件或为进展报告，尝试从全文正则与知名所名称匹配律所/会所
     compact_text = clean_pdf_value(flat)
     if not profile.get("law_firm"):
-        m_law = re.search(r"([\u4e00-\u9fa5（()）]{2,26}律师事务所)", compact_text)
-        if m_law:
+        for m_law in re.finditer(r"([\u4e00-\u9fa5（()）]{2,26}律师事务所)", compact_text):
             lf = re.sub(r"^.*?(?:联合|委托|聘请|会同|以及|与|和|及|、|，|。)", "", m_law.group(1)).strip()
-            if len(lf) >= 5:
+            lf = re.sub(r"^.*?(?:执业|机构|情况|为|有)", "", lf).strip()
+            if _is_valid_law_firm(lf):
                 profile["law_firm"] = lf
                 profile["law_firm_short"] = shorten_law_firm(lf)
-        else:
-            # 如“辅导机构、环球、容诚相关人员”或“中信证券、国浩律师、天健会计师”
+                break
+        if not profile.get("law_firm"):
             for root in KNOWN_LAW_ROOTS:
                 if re.search(r"(?:、|与|及|律师事务所|律师)" + re.escape(root) + r"(?:律师|相关人员|、|，)", compact_text) or (root + "律师") in compact_text:
                     profile["law_firm"] = f"{root}律师事务所"
@@ -357,13 +452,14 @@ def extract_profile_from_pdf_bytes(pdf_bytes, report_title="", is_filing_report=
                     break
 
     if not profile.get("acct_firm"):
-        m_acct = re.search(r"([\u4e00-\u9fa5]{2,22}会计师事务所(?:（特殊普通合伙）|\(特殊普通合伙\))?)", compact_text)
-        if m_acct:
+        for m_acct in re.finditer(r"([\u4e00-\u9fa5]{2,22}会计师事务所(?:（特殊普通合伙）|\(特殊普通合伙\))?)", compact_text):
             af = re.sub(r"^.*?(?:联合|委托|聘请|会同|以及|与|和|及|、|，|。)", "", m_acct.group(1)).strip()
-            if len(af) >= 6:
+            af = re.sub(r"^.*?(?:会计师事务|所)", "", af).strip() if af.startswith("会计师事务") else af
+            if _is_valid_acct_firm(af):
                 profile["acct_firm"] = af
                 profile["acct_firm_short"] = shorten_acct_firm(af)
-        else:
+                break
+        if not profile.get("acct_firm"):
             for root in KNOWN_ACCT_ROOTS:
                 if re.search(r"(?:、|与|及|会计师事务所|会计师)" + re.escape(root) + r"(?:会计师|相关人员|、|，)", compact_text) or (root + "会计师") in compact_text:
                     profile["acct_firm"] = f"{root}会计师事务所"
@@ -582,7 +678,7 @@ def _load_cross_reference_maps(data_dir):
     return ipo_map, neeq_by_abbr
 
 
-def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120):
+def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120, reparse_scanned=False):
     """
     直连中国证监会资本市场电子化信息披露平台（http://eid.csrc.gov.cn/csrcfd/），
     爬取全量公示页面 + 增量合并已有 tutoring_data.json + 并发解析辅导备案报告 PDF。
@@ -768,7 +864,22 @@ def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120):
 
     # 5. 并发解析未缓存企业 PDF（优先贵州证监局 + 按 update_date 降序最新企业）
     if parse_pdfs_limit and parse_pdfs_limit > 0 and pypdf is not None:
-        candidates = [r for r in all_records if not r.get("pdf_checked")]
+        ensure_macos_ocr_bin()
+        if reparse_scanned:
+            candidates = [
+                r for r in all_records
+                if (
+                    not r.get("pdf_checked")
+                    or not r.get("pdf_parsed")
+                    or not r.get("law_firm")
+                    or r.get("law_firm") == "—"
+                    or not r.get("acct_firm")
+                    or r.get("acct_firm") == "—"
+                )
+            ]
+        else:
+            candidates = [r for r in all_records if not r.get("pdf_checked")]
+
         candidates.sort(
             key=lambda x: (
                 1 if "贵州" in (x.get("bureau") or "") else 0,
@@ -804,7 +915,7 @@ def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120):
                 return rec["company"], combined
 
             parsed_ok = 0
-            with ThreadPoolExecutor(max_workers=8) as pool:
+            with ThreadPoolExecutor(max_workers=4) as pool:
                 futs = [pool.submit(worker, r) for r in todo]
                 for fut in as_completed(futs):
                     comp_name, prof = fut.result()
@@ -1018,6 +1129,7 @@ def main():
     parser.add_argument("--parse-pdfs", type=int, default=120, help="本次最多新解析多少家企业的 PDF 报告，默认 120")
     parser.add_argument("--backfill", action="store_true", help="是否同时执行 eid.csrc.gov.cn 时间切片回溯")
     parser.add_argument("--only-tutoring", action="store_true", help="仅更新辅导备案，跳过新三板采集")
+    parser.add_argument("--reparse-scanned", action="store_true", help="使用本地 OCR 重新解析之前未识别出的扫描件或缺失律所/会所的项目")
     args = parser.parse_args()
 
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1039,6 +1151,7 @@ def main():
             data_dir,
             backfill=args.backfill,
             parse_pdfs_limit=args.parse_pdfs,
+            reparse_scanned=args.reparse_scanned,
         )
         if tutoring_records:
             write_tutoring_sharded(data_dir, tutoring_records)
