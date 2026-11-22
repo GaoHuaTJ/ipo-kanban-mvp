@@ -1598,7 +1598,7 @@
   }
 
   function getFilteredTutoring() {
-    const { board, stage, bureau, keyword, sortBy, sortDir } = state.tutFilters;
+    const { board, stage, bureau, keyword } = state.tutFilters;
     const kw = keyword.trim().toLowerCase();
     const list = state.tutoringRecords.filter((r) => {
       if (board !== "全部" && (r.board || "沪深") !== board) return false;
@@ -1639,18 +1639,17 @@
       return true;
     });
 
-    const dir = sortDir === "asc" ? 1 : -1;
     list.sort((a, b) => {
-      const va = a[sortBy] && a[sortBy] !== "—" ? a[sortBy] : "";
-      const vb = b[sortBy] && b[sortBy] !== "—" ? b[sortBy] : "";
-      if (!va && !vb) return 0;
-      if (!va) return 1;
-      if (!vb) return -1;
-      if (va === vb) {
-        const secondary = sortBy === "update_date" ? "record_date" : "update_date";
-        return String(b[secondary] || "").localeCompare(String(a[secondary] || ""));
+      const va = a.update_date && a.update_date !== "—" ? a.update_date : "";
+      const vb = b.update_date && b.update_date !== "—" ? b.update_date : "";
+      if (va !== vb) {
+        if (!va) return 1;
+        if (!vb) return -1;
+        return vb.localeCompare(va);
       }
-      return va.localeCompare(vb) * dir;
+      const ra = a.record_date && a.record_date !== "—" ? a.record_date : "";
+      const rb = b.record_date && b.record_date !== "—" ? b.record_date : "";
+      return rb.localeCompare(ra);
     });
     return list;
   }
@@ -2423,15 +2422,6 @@
       document.querySelectorAll("#tut-bureau-chips .chip-btn, #tut-bureau-more .chip-btn").forEach((b) => {
         b.classList.toggle("active", b.dataset.val === state.tutFilters.bureau);
       });
-      document.querySelectorAll("th[data-tut-sort]").forEach((th) => {
-        const key = th.dataset.tutSort;
-        const isActive = state.tutFilters.sortBy === key;
-        th.classList.toggle("active", isActive);
-        const icon = $(`tut-sort-icon-${key}`);
-        if (icon) {
-          icon.textContent = isActive ? (state.tutFilters.sortDir === "asc" ? "↑" : "↓") : "⇅";
-        }
-      });
       $("tut-keyword").value = state.tutFilters.keyword;
       $("tut-clear-search").classList.toggle("hidden", !state.tutFilters.keyword);
     };
@@ -2472,21 +2462,6 @@
     };
     if ($("tut-bureau-chips")) $("tut-bureau-chips").addEventListener("click", handleBureauContainerClick);
     if ($("tut-bureau-more")) $("tut-bureau-more").addEventListener("click", handleBureauContainerClick);
-
-    document.querySelectorAll("th[data-tut-sort]").forEach((th) => {
-      th.addEventListener("click", () => {
-        const key = th.dataset.tutSort;
-        if (state.tutFilters.sortBy === key) {
-          state.tutFilters.sortDir = state.tutFilters.sortDir === "desc" ? "asc" : "desc";
-        } else {
-          state.tutFilters.sortBy = key;
-          state.tutFilters.sortDir = "desc";
-        }
-        state.tutFilters.page = 1;
-        syncTutUI();
-        renderTutoringTable();
-      });
-    });
 
     if ($("btn-tut-back")) {
       $("btn-tut-back").addEventListener("click", () => {
