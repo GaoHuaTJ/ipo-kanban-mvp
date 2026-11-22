@@ -300,7 +300,204 @@
       </div>
     </section>
 
-    <!-- 视图 3：项目详情页（方案 B 实时透传，还原图 2） -->
+    <!-- 视图 3：上市委审议（二期已上线） -->
+    <section id="view-committee" class="hidden">
+      <div id="committee-kpi-grid" class="kpi-grid"></div>
+
+      <div class="filter-minimal">
+        <div class="filter-row">
+          <span class="filter-label">板块：</span>
+          <div id="cm-board-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="沪主板">沪主板</button>
+            <button class="chip-btn" data-val="科创板">科创板</button>
+            <button class="chip-btn" data-val="深主板">深主板</button>
+            <button class="chip-btn" data-val="创业板">创业板</button>
+            <button class="chip-btn" data-val="北证">北证</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">结果：</span>
+          <div id="cm-result-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="上会通过">上会通过</button>
+            <button class="chip-btn" data-val="暂缓表决">暂缓表决</button>
+            <button class="chip-btn" data-val="未通过">未通过</button>
+            <button class="chip-btn" data-val="取消审核">取消审核</button>
+            <button class="chip-btn" data-val="待上会">待上会</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">年份：</span>
+          <div id="cm-year-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="2026">2026年</button>
+            <button class="chip-btn" data-val="2025">2025年</button>
+            <button class="chip-btn" data-val="2024">2024年</button>
+            <button class="chip-btn" data-val="2023">2023年</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-search-shell">
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="cm-keyword" class="google-search-input" type="text" placeholder="搜索发行人名称、保荐机构或参会委员姓名..." />
+            <button id="cm-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
+          </div>
+          <button id="cm-reset" class="action-btn" type="button">重置</button>
+          <button id="cm-export-excel" class="action-btn primary" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>导出 Excel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="cm-count">为您找到 0 条审议记录</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>发行人全称</th>
+              <th>板块</th>
+              <th>上会日期</th>
+              <th>审议结果</th>
+              <th>拟融资(亿元)</th>
+              <th>发行比例</th>
+              <th>保荐机构</th>
+              <th>参会委员</th>
+              <th>上市日期</th>
+            </tr>
+          </thead>
+          <tbody id="cm-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="cm-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="30" selected>30 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="cm-page-info" class="page-info">第 1 / 1 页</span>
+          <button id="cm-prev-page" class="action-btn sm">上一页</button>
+          <button id="cm-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图 4：发行动态（二期已上线） -->
+    <section id="view-issuance" class="hidden">
+      <div id="issuance-kpi-grid" class="kpi-grid"></div>
+
+      <div class="filter-minimal">
+        <div class="filter-row">
+          <span class="filter-label">板块：</span>
+          <div id="iss-board-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="沪主板">沪主板</button>
+            <button class="chip-btn" data-val="科创板">科创板</button>
+            <button class="chip-btn" data-val="深主板">深主板</button>
+            <button class="chip-btn" data-val="创业板">创业板</button>
+            <button class="chip-btn" data-val="北证">北证</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">状态：</span>
+          <div id="iss-status-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="待申购">待申购</button>
+            <button class="chip-btn" data-val="申购中">申购中</button>
+            <button class="chip-btn" data-val="待上市">待上市</button>
+            <button class="chip-btn" data-val="已上市">已上市</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">年份：</span>
+          <div id="iss-year-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="2026">2026年</button>
+            <button class="chip-btn" data-val="2025">2025年</button>
+            <button class="chip-btn" data-val="2024">2024年</button>
+            <button class="chip-btn" data-val="2023">2023年</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-search-shell">
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="iss-keyword" class="google-search-input" type="text" placeholder="搜索股票代码、简称、公司全称、主承销商或行业..." />
+            <button id="iss-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
+          </div>
+          <button id="iss-reset" class="action-btn" type="button">重置</button>
+          <button id="iss-export-excel" class="action-btn primary" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>导出 Excel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="iss-count">为您找到 0 条新股发行记录</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>代码 / 简称 / 全称</th>
+              <th>板块</th>
+              <th>发行状态</th>
+              <th>申购日期</th>
+              <th>上市日期</th>
+              <th>发行价(元)</th>
+              <th>发行PE / 行业PE</th>
+              <th>网上中签率</th>
+              <th>募资(亿元)</th>
+              <th>首日涨跌幅</th>
+              <th>主承销商</th>
+            </tr>
+          </thead>
+          <tbody id="iss-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="iss-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="30" selected>30 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="iss-page-info" class="page-info">第 1 / 1 页</span>
+          <button id="iss-prev-page" class="action-btn sm">上一页</button>
+          <button id="iss-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图 5：项目详情页（方案 B 实时透传） -->
     <section id="view-detail" class="detail-view hidden">
       <div class="detail-banner">
         <div class="detail-banner-inner">
@@ -353,11 +550,19 @@
           </div>
         </div>
 
-        <!-- 详情 Tab 3/4：二期规划 -->
+        <!-- 详情 Tab 3：发行动态（二期已点亮） -->
+        <div id="dtab-issue" class="hidden">
+          <div class="detail-card">
+            <div class="detail-card-title">新股发行与上市表现</div>
+            <div id="detail-issue-content"></div>
+          </div>
+        </div>
+
+        <!-- 详情 Tab 4：二期/三期规划 -->
         <div id="dtab-future" class="hidden">
           <div class="detail-card">
             <div class="placeholder-card" style="margin:0;border:none;background:transparent;padding:24px 0;">
-              <h3 id="dtab-future-title">二期规划模块</h3>
+              <h3 id="dtab-future-title">三期规划模块</h3>
               <p id="dtab-future-desc"></p>
             </div>
           </div>
@@ -365,10 +570,10 @@
       </div>
     </section>
 
-    <!-- 视图 4：二期规划占位页 -->
+    <!-- 视图 6：后续规划占位页 -->
     <section id="view-placeholder" class="hidden">
       <div class="placeholder-card">
-        <h3 id="placeholder-title">二期规划模块</h3>
+        <h3 id="placeholder-title">后续规划模块</h3>
         <p id="placeholder-desc"></p>
         <div id="placeholder-source" class="placeholder-meta"></div>
       </div>
@@ -377,6 +582,8 @@
 
   <!-- 内嵌本地 JS 数据兜底（双击打开 index.html 也能正常加载） -->
   <script src="./data/ipo_data.js"></script>
+  <script src="./data/committee_data.js"></script>
+  <script src="./data/issuance_data.js"></script>
   <script src="./assets/app.js"></script>
 </body>
 </html>

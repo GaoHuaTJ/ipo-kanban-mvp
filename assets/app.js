@@ -80,6 +80,9 @@
     meta: null,
     records: [],        // 全量审核记录（含注册同意/终止）
     activeRecords: [],  // 当前在审记录（全景图统计口径）
+    committeeRecords: [], // 二期：上市委审议记录
+    issuanceRecords: [],  // 二期：新股发行动态记录
+    currentDetailRec: null,
     activeTab: "全景图",
     previousTab: "审核动态",
     mapMode: "heatmap",
@@ -94,6 +97,22 @@
       province: "全部",
       keyword: "",
       sortBy: "update_date",
+      page: 1,
+      pageSize: 30,
+    },
+    cmFilters: {
+      board: "全部",
+      result: "全部",
+      year: "全部",
+      keyword: "",
+      page: 1,
+      pageSize: 30,
+    },
+    issFilters: {
+      board: "全部",
+      status: "全部",
+      year: "全部",
+      keyword: "",
       page: 1,
       pageSize: 30,
     },
@@ -115,13 +134,21 @@
       .replace(/"/g, "&quot;");
   }
 
-  async function loadData() {
+  async function loadJsonWithFallback(url, fallbackData) {
     try {
-      const resp = await fetch("./data/ipo_data.json", { cache: "no-cache" });
+      const resp = await fetch(url, { cache: "no-cache" });
       if (resp.ok) return await resp.json();
     } catch (_) {}
-    if (window.__IPO_DATA__) return window.__IPO_DATA__;
-    throw new Error("无法加载 data/ipo_data.json 或 data/ipo_data.js");
+    if (fallbackData) return fallbackData;
+    return { meta: {}, records: [] };
+  }
+
+  async function loadData() {
+    const res = await loadJsonWithFallback("./data/ipo_data.json", window.__IPO_DATA__);
+    if (!res || !res.records || !res.records.length) {
+      throw new Error("无法加载 data/ipo_data.json 或 data/ipo_data.js");
+    }
+    return res;
   }
 
   async function ensureChinaGeoJson() {
@@ -665,28 +692,85 @@
     $("detail-docs-full").innerHTML = buildListHtml(docs || []);
   }
 
+  function findIssuanceForCompany(rec) {
+    if (!rec || !state.issuanceRecords.length) return null;
+    const normComp = String(rec.company || "").replace(/[（()）\s]/g, "");
+    const code = String(rec.security_code || "").trim();
+    return (
+      state.issuanceRecords.find(
+        (x) =>
+          (code && x.security_code && x.security_code === code) ||
+          (normComp && String(x.company || "").replace(/[（()）\s]/g, "") === normComp)
+      ) || null
+    );
+  }
+
+  function renderDetailIssueTab(rec) {
+    const container = $("detail-issue-content");
+    const iss = findIssuanceForCompany(rec);
+    if (!iss) {
+      container.innerHTML = `<div style="color:#70757a;font-size:13.5px;padding:18px 0;">该项目暂未进入新股发行阶段（尚无公开申购/定价记录）。</div>`;
+      return;
+    }
+
+    const chgText =
+      iss.first_day_chg !== null && iss.first_day_chg !== undefined
+        ? `<span class="${iss.first_day_chg >= 0 ? "chg-up" : "chg-down"}">${iss.first_day_chg >= 0 ? "+" : ""}${iss.first_day_chg.toFixed(2)}%</span>`
+        : "—";
+
+    const items = [
+      ["股票代码", iss.security_code || "—", false],
+      ["股票简称", iss.abbr || "—", false],
+      ["发行状态", `<span class="stage-tag iss-${escapeHtml(iss.status)}"><span class="status-dot"></span>${escapeHtml(iss.status)}</span>`, true],
+      ["拟上市板块", `${iss.exchange} · ${iss.board}`, false],
+      ["网上申购日期", iss.apply_date || "—", false],
+      ["上市日期", iss.listing_date || "待定", false],
+      ["发行价格", iss.issue_price !== null ? `${iss.issue_price.toFixed(2)} 元` : "待询价/定价", false],
+      ["募集资金总额", iss.raise_yi !== null ? `${iss.raise_yi.toFixed(2)} 亿元` : "—", false],
+      ["发行市盈率", iss.issue_pe !== null ? `${iss.issue_pe.toFixed(2)} 倍` : "—", false],
+      ["行业市盈率", iss.industry_pe !== null ? `${iss.industry_pe.toFixed(2)} 倍` : "—", false],
+      ["网上中签率", iss.lwr_pct !== null ? `${iss.lwr_pct.toFixed(4)}%` : "—", false],
+      ["上市首日涨跌幅", chgText, true],
+      ["主承销商", iss.underwriter || "—", false],
+      ["发行方式", iss.issue_way || "—", false],
+    ];
+
+    container.innerHTML = `<div class="info-grid">${items
+      .map(
+        ([label, val, isHtml]) => `
+        <div class="info-item">
+          <span class="info-label">${label}</span>
+          <span class="info-value">${isHtml ? val : escapeHtml(val)}</span>
+        </div>`
+      )
+      .join("")}</div>`;
+  }
+
   function switchDetailTab(dtab) {
     document.querySelectorAll(".detail-tab").forEach((b) => b.classList.toggle("active", b.dataset.dtab === dtab));
     $("dtab-info").classList.toggle("hidden", dtab !== "info");
     $("dtab-docs").classList.toggle("hidden", dtab !== "docs");
-    const isFuture = dtab === "fundamental" || dtab === "issue";
-    $("dtab-future").classList.toggle("hidden", !isFuture);
-    if (dtab === "fundamental") {
-      $("dtab-future-title").textContent = "企业基本面（二期规划）";
-      $("dtab-future-desc").textContent = "后续将按需接入新三板/北交所公开财报接口，以及招股书财务摘要解析。";
-    } else if (dtab === "issue") {
-      $("dtab-future-title").textContent = "发行动态（二期规划）";
-      $("dtab-future-desc").textContent = "后续将接入东方财富新股发行接口，展示发行价、市盈率、网上申购日与中签率。";
+    $("dtab-issue").classList.toggle("hidden", dtab !== "issue");
+    $("dtab-future").classList.toggle("hidden", dtab !== "fundamental");
+
+    if (dtab === "issue") {
+      renderDetailIssueTab(state.currentDetailRec);
+    } else if (dtab === "fundamental") {
+      $("dtab-future-title").textContent = "企业基本面（三期规划）";
+      $("dtab-future-desc").textContent = "后续将接入新三板/北交所公开财报接口，展示近三年营收、净利润、毛利率与研发费用趋势。";
     }
   }
 
-  async function openProjectDetail(rec) {
+  async function openProjectDetail(rec, defaultDetailTab = "info") {
     state.previousTab = state.activeTab;
+    state.currentDetailRec = rec;
     $("view-overview").classList.add("hidden");
     $("view-dynamics").classList.add("hidden");
+    $("view-committee").classList.add("hidden");
+    $("view-issuance").classList.add("hidden");
     $("view-placeholder").classList.add("hidden");
     $("view-detail").classList.remove("hidden");
-    switchDetailTab("info");
+    switchDetailTab(defaultDetailTab);
     window.scrollTo({ top: 0, behavior: "smooth" });
 
     // 1. 先用本地列表数据瞬开骨架，零白屏
@@ -843,6 +927,368 @@
     URL.revokeObjectURL(url);
   }
 
+  // ==================== 二期：上市委审议 ====================
+  function updateCommitteeChipCounts() {
+    const bdCounts = {};
+    const resCounts = {};
+    const yrCounts = {};
+    for (const r of state.committeeRecords) {
+      bdCounts[r.board] = (bdCounts[r.board] || 0) + 1;
+      resCounts[r.result] = (resCounts[r.result] || 0) + 1;
+      const yr = (r.review_date || "").slice(0, 4);
+      if (yr) yrCounts[yr] = (yrCounts[yr] || 0) + 1;
+    }
+    document.querySelectorAll("#cm-board-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${bdCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#cm-result-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${resCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#cm-year-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+    });
+  }
+
+  function getFilteredCommittee() {
+    const { board, result, year, keyword } = state.cmFilters;
+    const kw = keyword.trim().toLowerCase();
+    return state.committeeRecords.filter((r) => {
+      if (board !== "全部" && r.board !== board) return false;
+      if (result !== "全部" && r.result !== result) return false;
+      if (year !== "全部" && !(r.review_date || "").startsWith(year)) return false;
+      if (kw) {
+        const hay = [r.company, r.abbr, r.sponsor, ...(r.members || [])].join(" ").toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderCommitteeKPI(filtered) {
+    const total = filtered.length;
+    const passed = filtered.filter((r) => r.result === "上会通过").length;
+    const deferred = filtered.filter((r) => r.result === "暂缓表决").length;
+    const rejected = filtered.filter((r) => r.result === "未通过" || r.result === "取消审核").length;
+    const decided = passed + deferred + rejected;
+    const passRate = decided > 0 ? ((passed / decided) * 100).toFixed(1) : "0.0";
+
+    $("committee-kpi-grid").innerHTML = `
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">当前筛选上会家数</div>
+        <div class="kpi-value">${total.toLocaleString()}</div>
+        <div class="kpi-sub">全面注册制（2023年至今）</div>
+      </div>
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">审议通过 / 综合过会率</div>
+        <div class="kpi-value">${passRate}%</div>
+        <div class="kpi-sub">上会通过 ${passed} 家</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">暂缓表决</div>
+        <div class="kpi-value">${deferred}</div>
+        <div class="kpi-sub">占比 ${total ? ((deferred / total) * 100).toFixed(1) : "0.0"}%</div>
+      </div>
+      <div class="kpi-card kpi-red">
+        <div class="kpi-label">未通过 / 取消审核</div>
+        <div class="kpi-value">${rejected}</div>
+        <div class="kpi-sub">占比 ${total ? ((rejected / total) * 100).toFixed(1) : "0.0"}%</div>
+      </div>
+    `;
+  }
+
+  function renderCommitteeTable() {
+    const filtered = getFilteredCommittee();
+    renderCommitteeKPI(filtered);
+
+    const total = filtered.length;
+    const { pageSize } = state.cmFilters;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (state.cmFilters.page > totalPages) state.cmFilters.page = totalPages;
+
+    const start = (state.cmFilters.page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    $("cm-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 条审议记录`;
+
+    const tbody = $("cm-tbody");
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的上市委审议记录</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows
+        .map(
+          (r, idx) => `
+          <tr class="clickable-row" data-cm-idx="${idx}">
+            <td><span class="row-index-badge">${start + idx + 1}</span></td>
+            <td><span class="company-link">${escapeHtml(r.company)}</span></td>
+            <td><span class="board-tag board-${escapeHtml(r.board)}">${escapeHtml(r.board)}</span></td>
+            <td class="date-cell">${escapeHtml(r.review_date || "-")}</td>
+            <td><span class="stage-tag res-${escapeHtml(r.result)}"><span class="status-dot"></span>${escapeHtml(r.result)}</span></td>
+            <td class="num-cell">${r.plan_raise_yi !== null && r.plan_raise_yi !== undefined ? r.plan_raise_yi.toFixed(2) : "—"}</td>
+            <td class="num-cell">${r.issue_ratio_pct !== null && r.issue_ratio_pct !== undefined ? r.issue_ratio_pct.toFixed(2) + "%" : "—"}</td>
+            <td style="color:#3c4043;">${escapeHtml(r.sponsor || "—")}</td>
+            <td class="member-cell">${escapeHtml((r.members || []).join("、") || "—")}</td>
+            <td class="date-cell muted">${escapeHtml(r.listing_date || "—")}</td>
+          </tr>`
+        )
+        .join("");
+
+      tbody.querySelectorAll("tr.clickable-row").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const item = pageRows[Number(tr.dataset.cmIdx)];
+          if (!item) return;
+          const norm = String(item.company || "").replace(/[（()）\s]/g, "");
+          const matched = state.records.find((x) => String(x.company || "").replace(/[（()）\s]/g, "") === norm);
+          openProjectDetail(
+            matched || {
+              company: item.company,
+              exchange: item.exchange,
+              board: item.board,
+              stage: item.result === "上会通过" ? "上市委" : "中止",
+              raw_status: item.result,
+              security_code: item.security_code || "",
+              province: "—",
+              industry: "—",
+              sponsors: item.sponsor ? [item.sponsor] : [],
+              law_firms: [],
+              accounting_firms: [],
+              accept_date: "",
+              update_date: item.review_date,
+              source_url: "",
+            }
+          );
+        });
+      });
+    }
+
+    $("cm-page-info").textContent = `第 ${state.cmFilters.page} / ${totalPages} 页`;
+    $("cm-prev-page").disabled = state.cmFilters.page <= 1;
+    $("cm-next-page").disabled = state.cmFilters.page >= totalPages;
+  }
+
+  function exportCommitteeExcel() {
+    const filtered = getFilteredCommittee();
+    const headers = ["序号", "发行人全称", "板块", "上会日期", "审议结果", "拟融资(亿元)", "发行比例(%)", "保荐机构", "参会委员", "上市日期"];
+    const rows = filtered.map((r, idx) => [
+      idx + 1,
+      r.company,
+      r.board,
+      r.review_date,
+      r.result,
+      r.plan_raise_yi ?? "",
+      r.issue_ratio_pct ?? "",
+      r.sponsor,
+      (r.members || []).join("、"),
+      r.listing_date,
+    ]);
+    exportGenericExcel(headers, rows, "上市委审议", `A股IPO上市委审议_${(state.meta && state.meta.update_date) || "export"}`);
+  }
+
+  // ==================== 二期：发行动态 ====================
+  function updateIssuanceChipCounts() {
+    const bdCounts = {};
+    const stCounts = {};
+    const yrCounts = {};
+    for (const r of state.issuanceRecords) {
+      bdCounts[r.board] = (bdCounts[r.board] || 0) + 1;
+      stCounts[r.status] = (stCounts[r.status] || 0) + 1;
+      const yr = (r.apply_date || "").slice(0, 4);
+      if (yr) yrCounts[yr] = (yrCounts[yr] || 0) + 1;
+    }
+    document.querySelectorAll("#iss-board-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${bdCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#iss-status-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${stCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#iss-year-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+    });
+  }
+
+  function getFilteredIssuance() {
+    const { board, status, year, keyword } = state.issFilters;
+    const kw = keyword.trim().toLowerCase();
+    return state.issuanceRecords.filter((r) => {
+      if (board !== "全部" && r.board !== board) return false;
+      if (status !== "全部" && r.status !== status) return false;
+      if (year !== "全部" && !(r.apply_date || "").startsWith(year)) return false;
+      if (kw) {
+        const hay = [r.security_code, r.abbr, r.company, r.underwriter, r.industry].join(" ").toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderIssuanceKPI(filtered) {
+    const total = filtered.length;
+    const upcoming = filtered.filter((r) => r.status === "待申购" || r.status === "申购中" || r.status === "待上市").length;
+    const totalRaise = filtered.reduce((acc, r) => acc + (r.raise_yi || 0), 0);
+    const chgList = filtered.map((r) => r.first_day_chg).filter((v) => v !== null && v !== undefined);
+    const avgChg = chgList.length ? chgList.reduce((a, b) => a + b, 0) / chgList.length : null;
+
+    $("issuance-kpi-grid").innerHTML = `
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">新股发行家数</div>
+        <div class="kpi-value">${total.toLocaleString()}</div>
+        <div class="kpi-sub">全面注册制（2023年至今）</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">待申购 / 待上市</div>
+        <div class="kpi-value">${upcoming}</div>
+        <div class="kpi-sub">近期活跃新股排期</div>
+      </div>
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">已披露累计募资（亿元）</div>
+        <div class="kpi-value">${totalRaise.toFixed(1)}</div>
+        <div class="kpi-sub">覆盖沪深北各板块</div>
+      </div>
+      <div class="kpi-card ${avgChg !== null && avgChg >= 0 ? "kpi-red" : "kpi-green"}">
+        <div class="kpi-label">已上市平均首日涨跌幅</div>
+        <div class="kpi-value">${avgChg !== null ? (avgChg >= 0 ? "+" : "") + avgChg.toFixed(1) + "%" : "—"}</div>
+        <div class="kpi-sub">样本 ${chgList.length} 家已上市新股</div>
+      </div>
+    `;
+  }
+
+  function renderIssuanceTable() {
+    const filtered = getFilteredIssuance();
+    renderIssuanceKPI(filtered);
+
+    const total = filtered.length;
+    const { pageSize } = state.issFilters;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (state.issFilters.page > totalPages) state.issFilters.page = totalPages;
+
+    const start = (state.issFilters.page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    $("iss-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 条新股发行记录`;
+
+    const tbody = $("iss-tbody");
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的新股发行记录</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows
+        .map((r, idx) => {
+          const peText =
+            r.issue_pe !== null
+              ? `${r.issue_pe.toFixed(2)} / ${r.industry_pe !== null ? r.industry_pe.toFixed(2) : "—"}`
+              : "—";
+          const chgHtml =
+            r.first_day_chg !== null
+              ? `<span class="${r.first_day_chg >= 0 ? "chg-up" : "chg-down"}">${r.first_day_chg >= 0 ? "+" : ""}${r.first_day_chg.toFixed(2)}%</span>`
+              : `<span style="color:#94a3b8;">—</span>`;
+          return `
+            <tr class="clickable-row" data-iss-idx="${idx}">
+              <td><span class="row-index-badge">${start + idx + 1}</span></td>
+              <td>
+                <div><span class="stock-code-pill">${escapeHtml(r.security_code)}</span><span class="company-link">${escapeHtml(r.abbr)}</span></div>
+                <div class="company-industry">${escapeHtml(r.company)}</div>
+              </td>
+              <td><span class="board-tag board-${escapeHtml(r.board)}">${escapeHtml(r.board)}</span></td>
+              <td><span class="stage-tag iss-${escapeHtml(r.status)}"><span class="status-dot"></span>${escapeHtml(r.status)}</span></td>
+              <td class="date-cell">${escapeHtml(r.apply_date || "—")}</td>
+              <td class="date-cell muted">${escapeHtml(r.listing_date || "待定")}</td>
+              <td class="num-cell">${r.issue_price !== null ? r.issue_price.toFixed(2) : "待定"}</td>
+              <td class="num-cell">${peText}</td>
+              <td class="num-cell">${r.lwr_pct !== null ? r.lwr_pct.toFixed(4) + "%" : "—"}</td>
+              <td class="num-cell">${r.raise_yi !== null ? r.raise_yi.toFixed(2) : "—"}</td>
+              <td>${chgHtml}</td>
+              <td style="color:#3c4043;">${escapeHtml(r.underwriter || "—")}</td>
+            </tr>`;
+        })
+        .join("");
+
+      tbody.querySelectorAll("tr.clickable-row").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const item = pageRows[Number(tr.dataset.issIdx)];
+          if (!item) return;
+          const norm = String(item.company || "").replace(/[（()）\s]/g, "");
+          const matched = state.records.find(
+            (x) =>
+              (item.security_code && x.security_code === item.security_code) ||
+              (norm && String(x.company || "").replace(/[（()）\s]/g, "") === norm)
+          );
+          openProjectDetail(
+            matched || {
+              company: item.company || item.abbr,
+              exchange: item.exchange,
+              board: item.board,
+              stage: "注册同意",
+              raw_status: item.status,
+              security_code: item.security_code,
+              province: "—",
+              industry: item.industry || "—",
+              sponsors: item.underwriter ? [item.underwriter] : [],
+              law_firms: [],
+              accounting_firms: [],
+              accept_date: "",
+              update_date: item.listing_date || item.apply_date,
+              source_url: "",
+            },
+            "issue"
+          );
+        });
+      });
+    }
+
+    $("iss-page-info").textContent = `第 ${state.issFilters.page} / ${totalPages} 页`;
+    $("iss-prev-page").disabled = state.issFilters.page <= 1;
+    $("iss-next-page").disabled = state.issFilters.page >= totalPages;
+  }
+
+  function exportIssuanceExcel() {
+    const filtered = getFilteredIssuance();
+    const headers = ["序号", "股票代码", "股票简称", "公司全称", "板块", "发行状态", "申购日期", "上市日期", "发行价(元)", "发行PE", "行业PE", "网上中签率(%)", "募资(亿元)", "首日涨跌幅(%)", "主承销商"];
+    const rows = filtered.map((r, idx) => [
+      idx + 1,
+      r.security_code,
+      r.abbr,
+      r.company,
+      r.board,
+      r.status,
+      r.apply_date,
+      r.listing_date,
+      r.issue_price ?? "",
+      r.issue_pe ?? "",
+      r.industry_pe ?? "",
+      r.lwr_pct ?? "",
+      r.raise_yi ?? "",
+      r.first_day_chg ?? "",
+      r.underwriter,
+    ]);
+    exportGenericExcel(headers, rows, "新股发行动态", `A股IPO发行动态_${(state.meta && state.meta.update_date) || "export"}`);
+  }
+
+  function exportGenericExcel(headers, rows, sheetName, filenameBase) {
+    if (window.XLSX) {
+      const ws = window.XLSX.utils.aoa_to_sheet([headers, ...rows]);
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, sheetName);
+      window.XLSX.writeFile(wb, `${filenameBase}.xlsx`);
+      return;
+    }
+    const tableHtml =
+      `<html><head><meta charset="UTF-8"></head><body><table>` +
+      `<tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr>` +
+      rows.map((r) => `<tr>${r.map((c) => `<td>${escapeHtml(c)}</td>`).join("")}</tr>`).join("") +
+      `</table></body></html>`;
+    const blob = new Blob(["\uFEFF" + tableHtml], { type: "application/vnd.ms-excel;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${filenameBase}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function switchSubTab(tabName) {
     state.activeTab = tabName;
     $("view-detail").classList.add("hidden");
@@ -852,10 +1298,13 @@
 
     $("view-overview").classList.toggle("hidden", tabName !== "全景图");
     $("view-dynamics").classList.toggle("hidden", tabName !== "审核动态");
+    $("view-committee").classList.toggle("hidden", tabName !== "上市委审议");
+    $("view-issuance").classList.toggle("hidden", tabName !== "发行动态");
 
+    const builtTabs = new Set(["全景图", "审核动态", "上市委审议", "发行动态"]);
     const placeholder = $("view-placeholder");
-    if (tabName !== "全景图" && tabName !== "审核动态") {
-      const info = FUTURE_TAB_INFO[tabName] || { title: tabName, desc: "MVP 二期规划接入", source: "" };
+    if (!builtTabs.has(tabName)) {
+      const info = FUTURE_TAB_INFO[tabName] || { title: tabName, desc: "后续规划接入", source: "" };
       $("placeholder-title").textContent = info.title;
       $("placeholder-desc").textContent = info.desc;
       $("placeholder-source").textContent = info.source;
@@ -999,6 +1448,78 @@
       renderDynamicsTable();
     });
 
+    // ==================== 二期：上市委审议事件绑定 ====================
+    const syncCmUI = () => {
+      document.querySelectorAll("#cm-board-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.cmFilters.board));
+      document.querySelectorAll("#cm-result-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.cmFilters.result));
+      document.querySelectorAll("#cm-year-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.cmFilters.year));
+      $("cm-keyword").value = state.cmFilters.keyword;
+      $("cm-clear-search").classList.toggle("hidden", !state.cmFilters.keyword);
+    };
+
+    document.querySelectorAll("#cm-board-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.cmFilters.board = btn.dataset.val; state.cmFilters.page = 1; syncCmUI(); renderCommitteeTable(); });
+    });
+    document.querySelectorAll("#cm-result-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.cmFilters.result = btn.dataset.val; state.cmFilters.page = 1; syncCmUI(); renderCommitteeTable(); });
+    });
+    document.querySelectorAll("#cm-year-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.cmFilters.year = btn.dataset.val; state.cmFilters.page = 1; syncCmUI(); renderCommitteeTable(); });
+    });
+    $("cm-keyword").addEventListener("input", (e) => {
+      state.cmFilters.keyword = e.target.value; state.cmFilters.page = 1;
+      $("cm-clear-search").classList.toggle("hidden", !state.cmFilters.keyword);
+      renderCommitteeTable();
+    });
+    $("cm-clear-search").addEventListener("click", () => {
+      state.cmFilters.keyword = ""; state.cmFilters.page = 1; syncCmUI(); renderCommitteeTable(); $("cm-keyword").focus();
+    });
+    $("cm-reset").addEventListener("click", () => {
+      const sz = state.cmFilters.pageSize;
+      state.cmFilters = { board: "全部", result: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
+      syncCmUI(); renderCommitteeTable();
+    });
+    $("cm-export-excel").addEventListener("click", exportCommitteeExcel);
+    $("cm-page-size").addEventListener("change", (e) => { state.cmFilters.pageSize = Number(e.target.value) || 30; state.cmFilters.page = 1; renderCommitteeTable(); });
+    $("cm-prev-page").addEventListener("click", () => { if (state.cmFilters.page > 1) { state.cmFilters.page -= 1; renderCommitteeTable(); } });
+    $("cm-next-page").addEventListener("click", () => { state.cmFilters.page += 1; renderCommitteeTable(); });
+
+    // ==================== 二期：发行动态事件绑定 ====================
+    const syncIssUI = () => {
+      document.querySelectorAll("#iss-board-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.issFilters.board));
+      document.querySelectorAll("#iss-status-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.issFilters.status));
+      document.querySelectorAll("#iss-year-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.issFilters.year));
+      $("iss-keyword").value = state.issFilters.keyword;
+      $("iss-clear-search").classList.toggle("hidden", !state.issFilters.keyword);
+    };
+
+    document.querySelectorAll("#iss-board-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.issFilters.board = btn.dataset.val; state.issFilters.page = 1; syncIssUI(); renderIssuanceTable(); });
+    });
+    document.querySelectorAll("#iss-status-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.issFilters.status = btn.dataset.val; state.issFilters.page = 1; syncIssUI(); renderIssuanceTable(); });
+    });
+    document.querySelectorAll("#iss-year-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.issFilters.year = btn.dataset.val; state.issFilters.page = 1; syncIssUI(); renderIssuanceTable(); });
+    });
+    $("iss-keyword").addEventListener("input", (e) => {
+      state.issFilters.keyword = e.target.value; state.issFilters.page = 1;
+      $("iss-clear-search").classList.toggle("hidden", !state.issFilters.keyword);
+      renderIssuanceTable();
+    });
+    $("iss-clear-search").addEventListener("click", () => {
+      state.issFilters.keyword = ""; state.issFilters.page = 1; syncIssUI(); renderIssuanceTable(); $("iss-keyword").focus();
+    });
+    $("iss-reset").addEventListener("click", () => {
+      const sz = state.issFilters.pageSize;
+      state.issFilters = { board: "全部", status: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
+      syncIssUI(); renderIssuanceTable();
+    });
+    $("iss-export-excel").addEventListener("click", exportIssuanceExcel);
+    $("iss-page-size").addEventListener("change", (e) => { state.issFilters.pageSize = Number(e.target.value) || 30; state.issFilters.page = 1; renderIssuanceTable(); });
+    $("iss-prev-page").addEventListener("click", () => { if (state.issFilters.page > 1) { state.issFilters.page -= 1; renderIssuanceTable(); } });
+    $("iss-next-page").addEventListener("click", () => { state.issFilters.page += 1; renderIssuanceTable(); });
+
     window.addEventListener("resize", () => {
       if (mapChart) mapChart.resize();
       if (sponsorChart) sponsorChart.resize();
@@ -1009,11 +1530,17 @@
   async function init() {
     bindEvents();
     try {
-      const payload = await loadData();
+      const [payload, cmPayload, issPayload] = await Promise.all([
+        loadData(),
+        loadJsonWithFallback("./data/committee_data.json", window.__COMMITTEE_DATA__),
+        loadJsonWithFallback("./data/issuance_data.json", window.__ISSUANCE_DATA__),
+      ]);
+
       state.meta = payload.meta || {};
       state.records = payload.records || [];
-      // 兼容旧版未带 is_active 的数据
       state.activeRecords = state.records.filter((r) => r.is_active !== false);
+      state.committeeRecords = (cmPayload && cmPayload.records) || [];
+      state.issuanceRecords = (issPayload && issPayload.records) || [];
 
       updateHeaderMeta();
       renderMatrix();
@@ -1021,6 +1548,12 @@
       populateProvinceSelect();
       renderDynamicsTable();
       renderOrgCharts();
+
+      updateCommitteeChipCounts();
+      renderCommitteeTable();
+      updateIssuanceChipCounts();
+      renderIssuanceTable();
+
       await renderMapOrBar();
     } catch (err) {
       console.error(err);
