@@ -8,6 +8,7 @@
 """
 
 import gzip
+import html as html_lib
 import http.cookiejar
 import json
 import os
@@ -57,15 +58,121 @@ def safe_float(val, digits=2):
         return None
 
 
-def classify_tutoring_stage(title):
-    t = str(title or "")
-    if "终止" in t or "撤回" in t:
-        return "终止/撤回"
-    if "验收" in t:
+def normalize_tutoring_status(raw):
+    s = str(raw or "").strip()
+    if "撤回" in s or "终止" in s:
+        return "撤回辅导备案"
+    if "完成" in s:
+        return "辅导工作完成"
+    if "验收" in s:
         return "辅导验收"
-    if "进展" in t and "获受理" not in t and "备案登记" not in t:
-        return "辅导进展"
-    return "辅导备案"
+    if "备案" in s:
+        return "辅导备案"
+    return s or "辅导备案"
+
+
+def strip_html(frag):
+    txt = re.sub(r"<[^>]+>", " ", str(frag or ""))
+    return re.sub(r"\s+", " ", html_lib.unescape(txt)).strip()
+
+
+def fetch_tutoring_records():
+    """
+    直连中国证监会资本市场电子化信息披露平台（http://eid.csrc.gov.cn/fd.html）
+    抓取全国 36 个派出机构（证监局）公开发行的全市场 A 股 IPO 辅导企业公示数据。
+    """
+    records = []
+    dedup = {}
+
+    def fetch_page_html(pg):
+        url = (
+            "http://eid.csrc.gov.cn/csrcfd/index.html"
+            if pg == 1
+            else f"http://eid.csrc.gov.cn/csrcfd/index_{pg}.html"
+        )
+        req = urllib.request.Request(url, headers={"User-Agent": UA, "Referer": "http://eid.csrc.gov.cn/fd.html"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.read().decode("utf-8", errors="replace")
+
+    first_html = fetch_page_html(1)
+    m_total = re.search(r"共\s*<b>\s*(\d+)\s*</b>\s*页", first_html)
+    total_pages = min(int(m_total.group(1)), 60) if m_total else 40
+
+    for pg in range(1, total_pages + 1):
+        if pg > 1:
+            time.sleep(0.12)
+            try:
+                page_html = fetch_page_html(pg)
+            except urllib.error.HTTPError as exc:
+                if exc.code == 404:
+                    break
+                raise
+        else:
+            page_html = first_html
+
+        trs = re.findall(r"<tr[^>]*>(.*?)</tr>", page_html, re.S)
+        current_rec = None
+        for tr in trs:
+            tds = re.findall(r"<td[^>]*>.*?</td>", tr, re.S)
+            if len(tds) < 8:
+                continue
+
+            marker = strip_html(tds[0])
+            if marker == ">":
+                company = strip_html(tds[1])
+                if not company:
+                    current_rec = None
+                    continue
+
+                sponsor = normalize_broker(strip_html(tds[2]))
+                record_date = fmt_date(strip_html(tds[3]))
+                status = normalize_tutoring_status(strip_html(tds[4]))
+                bureau = strip_html(tds[5])
+                report_type = strip_html(tds[6])
+
+                # 完整报告标题优先取 td[7] 的 title 属性或 downloadPdf1 第二个参数
+                m_title = re.search(r'title=["\']([^"\']+)["\']', tds[7])
+                m_pdf = re.search(r"downloadPdf1\(['\"]([^'\"]+)['\"],\s*['\"]([^'\"]*)['\"]", tr)
+                report_title = html_lib.unescape(m_title.group(1)).strip() if m_title else ""
+                if not report_title and m_pdf and m_pdf.group(2):
+                    report_title = html_lib.unescape(m_pdf.group(2)).strip()
+                if not report_title:
+                    report_title = strip_html(tds[7])
+
+                pdf_path = html_lib.unescape(m_pdf.group(1)).strip() if m_pdf else ""
+                pdf_url = (
+                    f"http://eid.csrc.gov.cn{urllib.parse.quote(pdf_path, safe='/')}"
+                    if pdf_path
+                    else ""
+                )
+
+                m_dt = re.search(r"/pre_ipo/(\d{4})/(\d{2})/(\d{2})/", pdf_path)
+                update_date = f"{m_dt.group(1)}-{m_dt.group(2)}-{m_dt.group(3)}" if m_dt else record_date
+
+                rec = {
+                    "company": company,
+                    "sponsor": sponsor or "—",
+                    "record_date": record_date or "—",
+                    "status": status,
+                    "bureau": bureau or "—",
+                    "report_type": report_type or "辅导报告",
+                    "report_title": report_title or report_type,
+                    "update_date": update_date or record_date or "—",
+                    "pdf_url": pdf_url,
+                    "report_count": 1,
+                }
+                current_rec = rec
+
+                prev = dedup.get(company)
+                if not prev or rec["update_date"] > prev["update_date"]:
+                    dedup[company] = rec
+            elif marker == "" and current_rec is not None:
+                # 同一企业展开的历史子行，累加报告份数
+                current_rec["report_count"] += 1
+
+    records = sorted(dedup.values(), key=lambda x: (x["update_date"], x["record_date"]), reverse=True)
+    print(f"[tutoring] 证监会辅导公示（eid.csrc.gov.cn）抓取完成，覆盖 {total_pages} 页，共获取 {len(records)} 家企业")
+    return records
 
 
 def create_neeq_client():
@@ -176,58 +283,6 @@ def fetch_neeq_records(nget):
     return out, neeq_map
 
 
-def fetch_tutoring_records(nget, neeq_map):
-    """直连全国股转系统公告检索接口采集辅导备案公告并关联所属地区/行业/主办券商。"""
-    records = []
-    seen = set()
-
-    for pg in range(25):
-        time.sleep(0.15)
-        j = nget(
-            "https://www.neeq.com.cn/disclosureInfoController/infoResult.do",
-            {"page": pg, "keyword": "辅导", "disclosureType": "0"},
-        )
-        li = (j[0].get("listInfo") if isinstance(j, list) and j and isinstance(j[0], dict) else None) or {}
-        rows = li.get("content") or []
-        if not rows:
-            break
-
-        for row in rows:
-            raw_title = str(row.get("disclosureTitle") or "").strip()
-            clean_title = re.sub(r"^\[临时公告\]\s*", "", raw_title).strip()
-            if "辅导" not in clean_title:
-                continue
-
-            dcode = str(row.get("disclosureCode") or "").strip()
-            if not dcode or dcode in seen:
-                continue
-            seen.add(dcode)
-
-            code = str(row.get("companyCd") or "").strip()
-            abbr = str(row.get("companyName") or "").strip()
-            notice_dt = fmt_date(row.get("publishDate"))
-            fpath = str(row.get("destFilePath") or row.get("filePath") or "").strip()
-            pdf_url = fpath if fpath.startswith("http") else (f"https://www.neeq.com.cn{fpath}" if fpath else "")
-
-            extra = neeq_map.get(code) or {}
-            records.append({
-                "id": dcode,
-                "code": code,
-                "abbr": abbr or extra.get("abbr") or "—",
-                "title": clean_title,
-                "stage": classify_tutoring_stage(clean_title),
-                "notice_date": notice_dt,
-                "pdf_url": pdf_url,
-                "province": extra.get("province") or "—",
-                "industry": extra.get("industry") or "—",
-                "broker": extra.get("broker") or "—",
-            })
-
-    out = sorted(records, key=lambda x: (x["notice_date"], x["code"]), reverse=True)
-    print(f"[tutoring] 抓取前 25 页辅导公告完成，共获取 {len(out)} 条")
-    return out
-
-
 def write_pair(data_dir, basename, global_var, records):
     today = datetime.now().strftime("%Y-%m-%d")
     payload = {
@@ -256,13 +311,7 @@ def main():
 
     try:
         nget = create_neeq_client()
-    except Exception as exc:
-        print(f"[neeq] 初始化会话失败: {exc}", file=sys.stderr)
-        sys.exit(1)
-
-    neeq_map = {}
-    try:
-        neeq_records, neeq_map = fetch_neeq_records(nget)
+        neeq_records, _ = fetch_neeq_records(nget)
         if neeq_records:
             write_pair(data_dir, "neeq_data", "__NEEQ_DATA__", neeq_records)
     except Exception as exc:
@@ -270,7 +319,7 @@ def main():
         sys.exit(1)
 
     try:
-        tutoring_records = fetch_tutoring_records(nget, neeq_map)
+        tutoring_records = fetch_tutoring_records()
         if tutoring_records:
             write_pair(data_dir, "tutoring_data", "__TUTORING_DATA__", tutoring_records)
     except Exception as exc:

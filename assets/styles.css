@@ -1699,14 +1699,27 @@ body {
   color: #b06000;
 }
 
-.tut-辅导验收 {
+.tut-辅导验收,
+.tut-辅导工作完成 {
   background: #e6f4ea;
   color: #137333;
 }
 
+.tut-撤回辅导备案,
 .tut-终止 {
   background: #fce8e6;
   color: #c5221f;
+}
+
+.bureau-pill {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .pdf-title-link {

@@ -120,7 +120,8 @@
       pageSize: 30,
     },
     tutFilters: {
-      stage: "全部",
+      status: "全部",
+      bureau: "全部",
       year: "全部",
       keyword: "",
       page: 1,
@@ -1334,33 +1335,72 @@
     URL.revokeObjectURL(url);
   }
 
-  // ==================== 二期第2周：辅导备案 ====================
+  // ==================== 全市场辅导备案（证监会全国36证监局直连） ====================
   function updateTutoringChipCounts() {
     const stCounts = {};
-    const yrCounts = {};
+    const brCounts = {};
+    const yrCounts = { older: 0 };
+
     for (const r of state.tutoringRecords) {
-      stCounts[r.stage] = (stCounts[r.stage] || 0) + 1;
-      const yr = (r.notice_date || "").slice(0, 4);
-      if (yr) yrCounts[yr] = (yrCounts[yr] || 0) + 1;
+      stCounts[r.status] = (stCounts[r.status] || 0) + 1;
+      brCounts[r.bureau] = (brCounts[r.bureau] || 0) + 1;
+      const yr = (r.record_date || "").slice(0, 4);
+      if (yr >= "2023") yrCounts[yr] = (yrCounts[yr] || 0) + 1;
+      else if (yr) yrCounts.older += 1;
     }
-    document.querySelectorAll("#tut-stage-chips .chip-btn").forEach((b) => {
+
+    document.querySelectorAll("#tut-status-chips .chip-btn").forEach((b) => {
       const v = b.dataset.val;
       if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${stCounts[v] || 0})</span>`;
     });
+
+    const quickBureaus = new Set();
+    document.querySelectorAll("#tut-bureau-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") {
+        quickBureaus.add(v);
+        b.innerHTML = `${v}<span class="chip-count">(${brCounts[v] || 0})</span>`;
+      }
+    });
+
+    // 填充其余证监局下拉列表（按家数降序）
+    const select = $("tut-bureau-select");
+    if (select) {
+      const others = Object.entries(brCounts)
+        .filter(([k]) => k && k !== "—" && !quickBureaus.has(k))
+        .sort((a, b) => b[1] - a[1]);
+      select.innerHTML = `<option value="全部">更多证监局 (${others.length})</option>`;
+      for (const [bName, cnt] of others) {
+        const opt = document.createElement("option");
+        opt.value = bName;
+        opt.textContent = `${bName} (${cnt})`;
+        select.appendChild(opt);
+      }
+    }
+
     document.querySelectorAll("#tut-year-chips .chip-btn").forEach((b) => {
       const v = b.dataset.val;
-      if (v !== "全部") b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+      if (v === "older") {
+        b.innerHTML = `2022及以前<span class="chip-count">(${yrCounts.older || 0})</span>`;
+      } else if (v !== "全部") {
+        b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+      }
     });
   }
 
   function getFilteredTutoring() {
-    const { stage, year, keyword } = state.tutFilters;
+    const { status, bureau, year, keyword } = state.tutFilters;
     const kw = keyword.trim().toLowerCase();
     return state.tutoringRecords.filter((r) => {
-      if (stage !== "全部" && r.stage !== stage) return false;
-      if (year !== "全部" && !(r.notice_date || "").startsWith(year)) return false;
+      if (status !== "全部" && r.status !== status) return false;
+      if (bureau !== "全部" && r.bureau !== bureau) return false;
+      if (year === "older") {
+        if (!r.record_date || r.record_date >= "2023-01-01") return false;
+      } else if (year !== "全部") {
+        if (!(r.record_date || "").startsWith(year)) return false;
+      }
       if (kw) {
-        const hay = [r.code, r.abbr, r.title, r.broker, r.industry, r.province].join(" ").toLowerCase();
+        const hay = [r.company, r.sponsor, r.bureau, r.report_type, r.report_title, r.status].join(" ").toLowerCase();
         if (!hay.includes(kw)) return false;
       }
       return true;
@@ -1369,30 +1409,30 @@
 
   function renderTutoringKPI(filtered) {
     const total = filtered.length;
-    const reg = filtered.filter((r) => r.stage === "辅导备案").length;
-    const prog = filtered.filter((r) => r.stage === "辅导进展").length;
-    const acc = filtered.filter((r) => r.stage === "辅导验收").length;
+    const filing = filtered.filter((r) => r.status === "辅导备案").length;
+    const done = filtered.filter((r) => r.status === "辅导验收" || r.status === "辅导工作完成").length;
+    const bureaus = new Set(filtered.map((r) => r.bureau).filter((b) => b && b !== "—")).size;
 
     $("tutoring-kpi-grid").innerHTML = `
       <div class="kpi-card kpi-blue">
-        <div class="kpi-label">辅导公告总数</div>
+        <div class="kpi-label">全市场辅导企业数</div>
         <div class="kpi-value">${total.toLocaleString()}</div>
-        <div class="kpi-sub">官方公开披露最新辅导公告</div>
+        <div class="kpi-sub">证监会辅导公示系统直连</div>
       </div>
       <div class="kpi-card kpi-blue">
-        <div class="kpi-label">辅导备案 / 受理</div>
-        <div class="kpi-value">${reg}</div>
-        <div class="kpi-sub">占比 ${total ? ((reg / total) * 100).toFixed(1) : "0.0"}%</div>
-      </div>
-      <div class="kpi-card kpi-amber">
-        <div class="kpi-label">辅导进展报告</div>
-        <div class="kpi-value">${prog}</div>
-        <div class="kpi-sub">占比 ${total ? ((prog / total) * 100).toFixed(1) : "0.0"}%</div>
+        <div class="kpi-label">辅导备案中</div>
+        <div class="kpi-value">${filing.toLocaleString()}</div>
+        <div class="kpi-sub">占比 ${total ? ((filing / total) * 100).toFixed(1) : "0.0"}%</div>
       </div>
       <div class="kpi-card kpi-green">
-        <div class="kpi-label">辅导验收通过</div>
-        <div class="kpi-value">${acc}</div>
-        <div class="kpi-sub">待申报上市企业储备</div>
+        <div class="kpi-label">辅导验收 / 工作完成</div>
+        <div class="kpi-value">${done.toLocaleString()}</div>
+        <div class="kpi-sub">IPO 申报重点储备梯队</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">覆盖地方证监局</div>
+        <div class="kpi-value">${bureaus}</div>
+        <div class="kpi-sub">涵盖沪深北全板块拟上市企业</div>
       </div>
     `;
   }
@@ -1409,28 +1449,32 @@
     const start = (state.tutFilters.page - 1) * pageSize;
     const pageRows = filtered.slice(start, start + pageSize);
 
-    $("tut-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 条辅导备案公告`;
+    $("tut-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 家全市场辅导备案企业`;
 
     const tbody = $("tut-tbody");
     if (!pageRows.length) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的辅导公告</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的辅导备案企业</td></tr>`;
     } else {
       tbody.innerHTML = pageRows
         .map((r, idx) => {
-          const stageClass = r.stage === "终止/撤回" ? "tut-终止" : `tut-${r.stage}`;
+          const stClass = `tut-${escapeHtml(r.status)}`;
           const titleHtml = r.pdf_url
-            ? `<a class="pdf-title-link" href="${escapeHtml(r.pdf_url)}" target="_blank" rel="noopener noreferrer"><span class="pdf-pill">PDF</span><span>${escapeHtml(r.title)}</span></a>`
-            : `<span>${escapeHtml(r.title)}</span>`;
+            ? `<a class="pdf-title-link" href="${escapeHtml(r.pdf_url)}" target="_blank" rel="noopener noreferrer" title="${escapeHtml(r.report_title)}"><span class="pdf-pill">PDF</span><span>${escapeHtml(r.report_title)}</span></a>`
+            : `<span>${escapeHtml(r.report_title)}</span>`;
+          const countSub = r.report_count > 1 ? ` · 共 ${r.report_count} 期` : "";
           return `
             <tr>
               <td><span class="row-index-badge">${start + idx + 1}</span></td>
-              <td style="white-space:nowrap;"><span class="stock-code-pill">${escapeHtml(r.code || "—")}</span><span class="company-link">${escapeHtml(r.abbr)}</span></td>
-              <td><span class="stage-tag ${stageClass}"><span class="status-dot"></span>${escapeHtml(r.stage)}</span></td>
-              <td style="max-width:420px;">${titleHtml}</td>
-              <td style="white-space:nowrap;color:#3c4043;">${escapeHtml((r.province || "—").replace(/省|市|维吾尔自治区|壮族自治区|回族自治区|自治区/g, ""))}</td>
-              <td style="color:#5f6368;">${escapeHtml(r.industry || "—")}</td>
-              <td style="color:#3c4043;white-space:nowrap;">${escapeHtml(r.broker || "—")}</td>
-              <td class="date-cell">${escapeHtml(r.notice_date || "—")}</td>
+              <td>
+                <span class="company-link">${escapeHtml(r.company)}</span>
+                <div class="company-industry">${escapeHtml(r.report_type)}${countSub}</div>
+              </td>
+              <td style="color:#3c4043;">${escapeHtml(r.sponsor || "—")}</td>
+              <td class="date-cell muted">${escapeHtml(r.record_date || "—")}</td>
+              <td><span class="stage-tag ${stClass}"><span class="status-dot"></span>${escapeHtml(r.status)}</span></td>
+              <td><span class="bureau-pill">${escapeHtml(r.bureau || "—")}</span></td>
+              <td style="max-width:390px;">${titleHtml}</td>
+              <td class="date-cell">${escapeHtml(r.update_date || "—")}</td>
             </tr>`;
         })
         .join("");
@@ -1443,20 +1487,20 @@
 
   function exportTutoringExcel() {
     const filtered = getFilteredTutoring();
-    const headers = ["序号", "证券代码", "公司简称", "辅导阶段", "公告标题", "所属地区", "行业", "主办券商", "公告日期", "PDF原文链接"];
+    const headers = ["序号", "辅导对象", "辅导机构", "备案时间", "辅导状态", "派出机构（证监局）", "最新报告类型", "最新报告标题", "更新日期", "PDF原文链接"];
     const rows = filtered.map((r, idx) => [
       idx + 1,
-      r.code,
-      r.abbr,
-      r.stage,
-      r.title,
-      r.province,
-      r.industry,
-      r.broker,
-      r.notice_date,
+      r.company,
+      r.sponsor,
+      r.record_date,
+      r.status,
+      r.bureau,
+      r.report_type,
+      r.report_title,
+      r.update_date,
       r.pdf_url,
     ]);
-    exportGenericExcel(headers, rows, "辅导备案公告", `IPO辅导备案公告_${(state.meta && state.meta.update_date) || "export"}`);
+    exportGenericExcel(headers, rows, "全市场IPO辅导备案", `全市场A股IPO辅导备案_${(state.meta && state.meta.update_date) || "export"}`);
   }
 
   // ==================== 二期第2周：新三板挂牌 ====================
@@ -1831,17 +1875,37 @@
     $("iss-prev-page").addEventListener("click", () => { if (state.issFilters.page > 1) { state.issFilters.page -= 1; renderIssuanceTable(); } });
     $("iss-next-page").addEventListener("click", () => { state.issFilters.page += 1; renderIssuanceTable(); });
 
-    // ==================== 二期第2周：辅导备案事件绑定 ====================
+    // ==================== 全市场辅导备案事件绑定 ====================
     const syncTutUI = () => {
-      document.querySelectorAll("#tut-stage-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.tutFilters.stage));
+      document.querySelectorAll("#tut-status-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.tutFilters.status));
+      let matchedQuick = false;
+      document.querySelectorAll("#tut-bureau-chips .chip-btn").forEach((b) => {
+        const active = b.dataset.val === state.tutFilters.bureau;
+        if (active) matchedQuick = true;
+        b.classList.toggle("active", active);
+      });
+      const sel = $("tut-bureau-select");
+      if (sel) sel.value = matchedQuick ? "全部" : state.tutFilters.bureau;
+
       document.querySelectorAll("#tut-year-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.tutFilters.year));
       $("tut-keyword").value = state.tutFilters.keyword;
       $("tut-clear-search").classList.toggle("hidden", !state.tutFilters.keyword);
     };
 
-    document.querySelectorAll("#tut-stage-chips .chip-btn").forEach((btn) => {
-      btn.addEventListener("click", () => { state.tutFilters.stage = btn.dataset.val; state.tutFilters.page = 1; syncTutUI(); renderTutoringTable(); });
+    document.querySelectorAll("#tut-status-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.tutFilters.status = btn.dataset.val; state.tutFilters.page = 1; syncTutUI(); renderTutoringTable(); });
     });
+    document.querySelectorAll("#tut-bureau-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.tutFilters.bureau = btn.dataset.val; state.tutFilters.page = 1; syncTutUI(); renderTutoringTable(); });
+    });
+    if ($("tut-bureau-select")) {
+      $("tut-bureau-select").addEventListener("change", (e) => {
+        state.tutFilters.bureau = e.target.value;
+        state.tutFilters.page = 1;
+        syncTutUI();
+        renderTutoringTable();
+      });
+    }
     document.querySelectorAll("#tut-year-chips .chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => { state.tutFilters.year = btn.dataset.val; state.tutFilters.page = 1; syncTutUI(); renderTutoringTable(); });
     });
@@ -1855,7 +1919,7 @@
     });
     $("tut-reset").addEventListener("click", () => {
       const sz = state.tutFilters.pageSize;
-      state.tutFilters = { stage: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
+      state.tutFilters = { status: "全部", bureau: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
       syncTutUI(); renderTutoringTable();
     });
     $("tut-export-excel").addEventListener("click", exportTutoringExcel);
