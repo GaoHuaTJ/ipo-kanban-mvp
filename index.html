@@ -576,47 +576,35 @@
       </div>
     </section>
 
-    <!-- 视图 6：辅导备案（直连中国证监会全国 36 证监局公示系统） -->
+    <!-- 视图 6：辅导备案（直连中国证监会全国 36 证监局公示系统 · 概览页） -->
     <section id="view-tutoring" class="hidden">
-      <div id="tutoring-kpi-grid" class="kpi-grid"></div>
-
       <div class="filter-minimal">
         <div class="filter-row">
-          <span class="filter-label">状态：</span>
-          <div id="tut-status-chips" class="chip-list">
+          <span class="filter-label">场所：</span>
+          <div id="tut-board-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="沪深">沪深</button>
+            <button class="chip-btn" data-val="北证">北证</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">阶段：</span>
+          <div id="tut-stage-chips" class="chip-list" style="align-items:center;">
             <button class="chip-btn active" data-val="全部">全部</button>
             <button class="chip-btn" data-val="辅导备案">辅导备案</button>
+            <button class="chip-btn" data-val="辅导中期">辅导中期</button>
             <button class="chip-btn" data-val="辅导验收">辅导验收</button>
-            <button class="chip-btn" data-val="辅导工作完成">辅导工作完成</button>
-            <button class="chip-btn" data-val="撤回辅导备案">撤回辅导备案</button>
+            <span class="filter-vsep" aria-hidden="true"></span>
+            <button class="chip-btn" data-val="未受理">未受理</button>
+            <button class="chip-btn" data-val="已受理">已受理</button>
+            <button class="chip-btn" data-val="辅导终止">辅导终止</button>
           </div>
         </div>
-        <div class="filter-row">
-          <span class="filter-label">辖区：</span>
-          <div id="tut-bureau-chips" class="chip-list" style="align-items:center;">
-            <button class="chip-btn active" data-val="全部">全部</button>
-            <button class="chip-btn" data-val="江苏证监局">江苏证监局</button>
-            <button class="chip-btn" data-val="浙江证监局">浙江证监局</button>
-            <button class="chip-btn" data-val="广东证监局">广东证监局</button>
-            <button class="chip-btn" data-val="深圳证监局">深圳证监局</button>
-            <button class="chip-btn" data-val="上海证监局">上海证监局</button>
-            <button class="chip-btn" data-val="北京证监局">北京证监局</button>
-            <button class="chip-btn" data-val="山东证监局">山东证监局</button>
-            <button class="chip-btn" data-val="四川证监局">四川证监局</button>
-            <select id="tut-bureau-select" class="select-control page-size-select" aria-label="其他证监局筛选" style="margin-left:4px;">
-              <option value="全部">更多证监局...</option>
-            </select>
-          </div>
-        </div>
-        <div class="filter-row">
-          <span class="filter-label">备案：</span>
-          <div id="tut-year-chips" class="chip-list">
-            <button class="chip-btn active" data-val="全部">全部</button>
-            <button class="chip-btn" data-val="2026">2026年</button>
-            <button class="chip-btn" data-val="2025">2025年</button>
-            <button class="chip-btn" data-val="2024">2024年</button>
-            <button class="chip-btn" data-val="2023">2023年</button>
-            <button class="chip-btn" data-val="older">2022及以前</button>
+        <div class="filter-row tut-bureau-row">
+          <span class="filter-label">证监局：</span>
+          <div class="tut-bureau-wrap">
+            <div id="tut-bureau-chips" class="chip-list" style="align-items:center;"></div>
+            <div id="tut-bureau-more" class="chip-list tut-bureau-more hidden"></div>
           </div>
         </div>
       </div>
@@ -627,7 +615,7 @@
             <span class="search-icon" aria-hidden="true">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
             </span>
-            <input id="tut-keyword" class="google-search-input" type="text" placeholder="搜索辅导对象全称、辅导机构（保荐券商）、证监局或报告标题..." />
+            <input id="tut-keyword" class="google-search-input" type="text" placeholder="查询企业名称、证监局、辅导券商、律师事务所、会计师事务所等" />
             <button id="tut-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
           </div>
           <button id="tut-reset" class="action-btn" type="button">重置</button>
@@ -639,7 +627,7 @@
       </div>
 
       <div class="table-toolbar">
-        <span id="tut-count">为您找到 0 家全市场辅导备案企业</span>
+        <span id="tut-count">为您找到 0 条相关结果</span>
       </div>
 
       <div class="table-wrap">
@@ -647,13 +635,15 @@
           <thead>
             <tr>
               <th>序号</th>
-              <th>辅导对象</th>
-              <th>辅导机构</th>
-              <th>备案时间</th>
+              <th>企业全称</th>
+              <th>申报板块</th>
               <th>辅导状态</th>
-              <th>派出机构（证监局）</th>
-              <th>最新报告类型 / 报告标题（点击查看PDF）</th>
-              <th>更新日期</th>
+              <th>辅导券商</th>
+              <th>律师事务所</th>
+              <th>会计师事务所</th>
+              <th>证监局</th>
+              <th class="sortable-th active" data-tut-sort="update_date">更新日期 <span id="tut-sort-icon-update_date" class="sort-arrows">↓</span></th>
+              <th class="sortable-th" data-tut-sort="record_date">备案日期 <span id="tut-sort-icon-record_date" class="sort-arrows">⇅</span></th>
             </tr>
           </thead>
           <tbody id="tut-tbody"></tbody>
@@ -674,6 +664,44 @@
           <span id="tut-page-info" class="page-info">第 1 / 1 页</span>
           <button id="tut-prev-page" class="action-btn sm">上一页</button>
           <button id="tut-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图 6B：辅导备案详情页（图 2 & 图 3 结构，信息源自辅导备案报告） -->
+    <section id="view-tutoring-detail" class="detail-view hidden">
+      <div class="detail-banner">
+        <div class="detail-banner-inner">
+          <div class="detail-banner-left">
+            <button id="btn-tut-back" class="back-btn" type="button">← 返回列表</button>
+            <h2 id="tut-detail-company" class="detail-company-name">辅导企业详情</h2>
+            <span class="detail-badge">IPO辅导备案</span>
+            <span id="tut-detail-board-badge" class="detail-badge">沪深</span>
+            <span id="tut-detail-stage-badge" class="detail-badge detail-badge-stage">尚未验收</span>
+          </div>
+          <div class="live-status-pill">
+            <span id="tut-detail-dot" class="source-dot"></span>
+            <span id="tut-detail-source-text">证监会辅导公示直连</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 节点绿色进度条：辅导备案 → 辅导中期 → 辅导验收 -->
+      <div class="timeline-strip">
+        <div id="tut-detail-timeline" class="timeline-inner tut-timeline-inner"></div>
+      </div>
+
+      <div class="detail-body">
+        <div id="tut-detail-notice" class="detail-notice hidden"></div>
+
+        <div class="detail-card">
+          <div class="detail-card-title">（一）基本信息</div>
+          <div id="tut-detail-info-grid" class="info-grid"></div>
+        </div>
+
+        <div class="detail-card">
+          <div class="detail-card-title">（二）信息披露</div>
+          <div id="tut-detail-docs-wrap"></div>
         </div>
       </div>
     </section>

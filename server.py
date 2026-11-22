@@ -15,11 +15,21 @@ import json
 import os
 import re
 import ssl
+import sys
 import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone, timedelta
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+SCRIPTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "scripts")
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
+
+try:
+    from fetch_phase2_w2 import parse_tutoring_pdf_url
+except Exception:
+    parse_tutoring_pdf_url = None
 
 UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -552,7 +562,41 @@ class IpoKanbanHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/project-detail":
             self.handle_project_detail(parsed.query)
             return
+        if parsed.path == "/api/tutoring-detail":
+            self.handle_tutoring_detail(parsed.query)
+            return
         super().do_GET()
+
+    def handle_tutoring_detail(self, query_str):
+        params = urllib.parse.parse_qs(query_str)
+        pdf_url = (params.get("pdf_url") or [""])[0].strip()
+        if not pdf_url:
+            self.send_json(400, {"ok": False, "error": "缺少 pdf_url 参数"})
+            return
+
+        u = urllib.parse.urlparse(pdf_url)
+        if u.netloc != "eid.csrc.gov.cn" or u.scheme not in ("http", "https"):
+            self.send_json(400, {"ok": False, "error": "仅允许解析 eid.csrc.gov.cn 官方辅导报告"})
+            return
+
+        if parse_tutoring_pdf_url is None:
+            self.send_json(501, {"ok": False, "error": "本地环境缺少 pypdf，无法实时解析"})
+            return
+
+        cache_key = f"tut::{pdf_url}"
+        now = time.time()
+        cached = CACHE.get(cache_key)
+        if cached and (now - cached[0] < CACHE_TTL_SEC):
+            self.send_json(200, cached[1])
+            return
+
+        try:
+            prof = parse_tutoring_pdf_url(pdf_url, timeout=16)
+            res = {"ok": True, "profile": {k: v for k, v in prof.items() if not k.startswith("_")}, "has_text": bool(prof.get("_has_text"))}
+            CACHE[cache_key] = (now, res)
+            self.send_json(200, res)
+        except Exception as exc:
+            self.send_json(502, {"ok": False, "error": f"辅导报告 PDF 解析失败: {exc}"})
 
     def handle_project_detail(self, query_str):
         params = urllib.parse.parse_qs(query_str)
