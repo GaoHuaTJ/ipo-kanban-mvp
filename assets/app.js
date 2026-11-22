@@ -247,6 +247,52 @@
     return out.length ? out.join("、") : txt;
   }
 
+  function buildPageRange(current, total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    if (current <= 4) {
+      return [1, 2, 3, 4, 5, "...", total];
+    }
+    if (current >= total - 3) {
+      return [1, "...", total - 4, total - 3, total - 2, total - 1, total];
+    }
+    return [1, "...", current - 1, current, current + 1, "...", total];
+  }
+
+  function renderPageNumbers(prevBtnId, currentPage, totalPages, onSelectPage) {
+    const prevBtn = $(prevBtnId);
+    if (!prevBtn || !prevBtn.parentNode) return;
+    let wrap = prevBtn.parentNode.querySelector(".page-numbers");
+    if (!wrap) {
+      wrap = document.createElement("div");
+      wrap.className = "page-numbers";
+      prevBtn.insertAdjacentElement("afterend", wrap);
+    }
+    if (totalPages <= 1) {
+      wrap.innerHTML = "";
+      wrap.classList.add("hidden");
+      return;
+    }
+    wrap.classList.remove("hidden");
+    const items = buildPageRange(currentPage, totalPages);
+    wrap.innerHTML = items
+      .map((item) =>
+        item === "..."
+          ? `<span class="page-ellipsis" aria-hidden="true">···</span>`
+          : `<button type="button" class="page-num-btn${item === currentPage ? " active" : ""}" data-page="${item}" aria-label="第 ${item} 页">${item}</button>`
+      )
+      .join("");
+    wrap.querySelectorAll(".page-num-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const p = Number(btn.dataset.page);
+        if (p && p !== currentPage) {
+          onSelectPage(p);
+        }
+      });
+    });
+  }
+
   async function loadJsonWithFallback(url, fallbackData) {
     try {
       const resp = await fetch(url, { cache: "no-cache" });
@@ -738,6 +784,10 @@
     $("page-info").textContent = `第 ${state.filters.page} / ${totalPages} 页`;
     $("btn-prev-page").disabled = state.filters.page <= 1;
     $("btn-next-page").disabled = state.filters.page >= totalPages;
+    renderPageNumbers("btn-prev-page", state.filters.page, totalPages, (p) => {
+      state.filters.page = p;
+      renderDynamicsTable();
+    });
   }
 
   // ==================== 项目详情页（方案 B 实时透传） ====================
@@ -1207,6 +1257,10 @@
     $("cm-page-info").textContent = `第 ${state.cmFilters.page} / ${totalPages} 页`;
     $("cm-prev-page").disabled = state.cmFilters.page <= 1;
     $("cm-next-page").disabled = state.cmFilters.page >= totalPages;
+    renderPageNumbers("cm-prev-page", state.cmFilters.page, totalPages, (p) => {
+      state.cmFilters.page = p;
+      renderCommitteeTable();
+    });
   }
 
   function exportCommitteeExcel() {
@@ -1383,6 +1437,10 @@
     $("iss-page-info").textContent = `第 ${state.issFilters.page} / ${totalPages} 页`;
     $("iss-prev-page").disabled = state.issFilters.page <= 1;
     $("iss-next-page").disabled = state.issFilters.page >= totalPages;
+    renderPageNumbers("iss-prev-page", state.issFilters.page, totalPages, (p) => {
+      state.issFilters.page = p;
+      renderIssuanceTable();
+    });
   }
 
   function exportIssuanceExcel() {
@@ -1610,6 +1668,10 @@
     $("tut-page-info").textContent = `第 ${state.tutFilters.page} / ${totalPages} 页`;
     $("tut-prev-page").disabled = state.tutFilters.page <= 1;
     $("tut-next-page").disabled = state.tutFilters.page >= totalPages;
+    renderPageNumbers("tut-prev-page", state.tutFilters.page, totalPages, (p) => {
+      state.tutFilters.page = p;
+      renderTutoringTable();
+    });
   }
 
   function renderTutTimeline(rec) {
@@ -2005,6 +2067,10 @@
     $("neeq-page-info").textContent = `第 ${state.neeqFilters.page} / ${totalPages} 页`;
     $("neeq-prev-page").disabled = state.neeqFilters.page <= 1;
     $("neeq-next-page").disabled = state.neeqFilters.page >= totalPages;
+    renderPageNumbers("neeq-prev-page", state.neeqFilters.page, totalPages, (p) => {
+      state.neeqFilters.page = p;
+      renderNeeqTable();
+    });
   }
 
   function exportNeeqExcel() {
