@@ -4,7 +4,7 @@
 仅使用 Python 标准库与系统自带 git，无需 brew / gh。
 
 用法：
-    cd /Users/waltergao/.gemini/antigravity/scratch/ipo-kanban-mvp
+    cd /Users/waltergao/.gemini/antigravity/scratch/ipoflow
     python3 scripts/deploy_github.py
 """
 
@@ -18,7 +18,7 @@ import urllib.error
 import urllib.request
 
 OWNER = "GaoHuaTJ"
-REPO = "ipo-kanban-mvp"
+REPO = "ipoflow"
 API_BASE = "https://api.github.com"
 
 

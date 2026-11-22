@@ -2,9 +2,9 @@
 
 零成本打造的 A股IPO 首发上市数据聚合与实时查询看板，采用 **Google Material Design 3 蓝白极简风**，实现 **0 元服务器费用、0 元商业接口费用、每日自动更新**。
 
-- **全功能公网地址（推荐，含方案 B 实时详情）**：https://ipo-kanban-mvp.pages.dev
-- **纯静态备份地址（GitHub Pages）**：https://gaohuatj.github.io/ipo-kanban-mvp/
-- **GitHub 仓库**：https://github.com/GaoHuaTJ/ipo-kanban-mvp
+- **全功能公网地址（推荐，含方案 B 实时详情）**：https://ipoflow.pages.dev
+- **纯静态备份地址（GitHub Pages）**：https://gaohuatj.github.io/ipoflow/
+- **GitHub 仓库**：https://github.com/GaoHuaTJ/ipoflow
 
 ---
 
