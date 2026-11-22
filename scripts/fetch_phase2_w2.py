@@ -724,14 +724,28 @@ def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120, repar
         except Exception as exc:
             print(f"[tutoring] 读取存量基线跳过: {exc}")
 
+    csrc_cj = http.cookiejar.CookieJar()
+    csrc_opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(csrc_cj))
+    csrc_headers = {
+        "User-Agent": UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Referer": "http://eid.csrc.gov.cn/fd.html",
+    }
+    try:
+        with csrc_opener.open(urllib.request.Request("http://eid.csrc.gov.cn/fd.html", headers=csrc_headers), timeout=12) as r:
+            r.read()
+    except Exception:
+        pass
+
     def fetch_page_html(pg):
         url = (
             "http://eid.csrc.gov.cn/csrcfd/index.html"
             if pg == 1
             else f"http://eid.csrc.gov.cn/csrcfd/index_{pg}.html"
         )
-        req = urllib.request.Request(url, headers={"User-Agent": UA, "Referer": "http://eid.csrc.gov.cn/fd.html"})
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        req = urllib.request.Request(url, headers=csrc_headers)
+        with csrc_opener.open(req, timeout=15) as resp:
             return resp.read().decode("utf-8", errors="replace")
 
     def merge_parsed_items(parsed_items):
@@ -1130,6 +1144,7 @@ def main():
     parser.add_argument("--backfill", action="store_true", help="是否同时执行 eid.csrc.gov.cn 时间切片回溯")
     parser.add_argument("--only-tutoring", action="store_true", help="仅更新辅导备案，跳过新三板采集")
     parser.add_argument("--reparse-scanned", action="store_true", help="使用本地 OCR 重新解析之前未识别出的扫描件或缺失律所/会所的项目")
+    parser.add_argument("--soft-fail", action="store_true", help="上游接口超时或海外 IP 被 WAF 拦截时仅打印警告并保留存量数据，不中断 CI 流水线")
     args = parser.parse_args()
 
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -1143,8 +1158,11 @@ def main():
             if neeq_records:
                 write_pair(data_dir, "neeq_data", "__NEEQ_DATA__", neeq_records)
         except Exception as exc:
-            print(f"[neeq] 采集失败: {exc}", file=sys.stderr)
-            sys.exit(1)
+            if args.soft_fail:
+                print(f"[neeq][WARN] 采集跳过（已保留存量基线数据）: {exc}")
+            else:
+                print(f"[neeq] 采集失败: {exc}", file=sys.stderr)
+                sys.exit(1)
 
     try:
         tutoring_records = fetch_tutoring_records(
@@ -1156,8 +1174,11 @@ def main():
         if tutoring_records:
             write_tutoring_sharded(data_dir, tutoring_records)
     except Exception as exc:
-        print(f"[tutoring] 采集失败: {exc}", file=sys.stderr)
-        sys.exit(1)
+        if args.soft_fail:
+            print(f"[tutoring][WARN] 采集跳过（可能因海外 CI IP 被 eid.csrc.gov.cn WAF 拦截，已保留存量基线数据）: {exc}")
+        else:
+            print(f"[tutoring] 采集失败: {exc}", file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":
