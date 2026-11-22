@@ -155,14 +155,20 @@
           <div class="panel-card">
             <div class="panel-card-header">
               <h3 class="section-title">A股IPO在审</h3>
-              <div class="radio-group">
-                <label class="radio-label">
-                  <input type="radio" name="rightOrgType" value="law" checked />
-                  <span>律师事务所</span>
-                </label>
-                <label class="radio-label">
-                  <input type="radio" name="rightOrgType" value="accounting" />
-                  <span>会计师事务所</span>
+              <div class="header-controls-right">
+                <div class="radio-group">
+                  <label class="radio-label">
+                    <input type="radio" name="rightOrgType" value="law" checked />
+                    <span>律师事务所</span>
+                  </label>
+                  <label class="radio-label">
+                    <input type="radio" name="rightOrgType" value="accounting" />
+                    <span>会计师事务所</span>
+                  </label>
+                </div>
+                <label class="hq-toggle" title="将各地分所（如上海/杭州/深圳分所）合并至总所统一排名">
+                  <input type="checkbox" id="toggle-hq-merge" checked />
+                  <span>归并总所</span>
                 </label>
               </div>
             </div>
@@ -570,7 +576,183 @@
       </div>
     </section>
 
-    <!-- 视图 6：后续规划占位页 -->
+    <!-- 视图 6：辅导备案（二期第2周已上线） -->
+    <section id="view-tutoring" class="hidden">
+      <div id="tutoring-kpi-grid" class="kpi-grid"></div>
+
+      <div class="filter-minimal">
+        <div class="filter-row">
+          <span class="filter-label">阶段：</span>
+          <div id="tut-stage-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="辅导备案">辅导备案</button>
+            <button class="chip-btn" data-val="辅导进展">辅导进展</button>
+            <button class="chip-btn" data-val="辅导验收">辅导验收</button>
+            <button class="chip-btn" data-val="终止/撤回">终止/撤回</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">年份：</span>
+          <div id="tut-year-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="2026">2026年</button>
+            <button class="chip-btn" data-val="2025">2025年</button>
+            <button class="chip-btn" data-val="2024">2024年</button>
+            <button class="chip-btn" data-val="2023">2023年</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-search-shell">
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="tut-keyword" class="google-search-input" type="text" placeholder="搜索证券代码、公司简称、公告标题或主办券商..." />
+            <button id="tut-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
+          </div>
+          <button id="tut-reset" class="action-btn" type="button">重置</button>
+          <button id="tut-export-excel" class="action-btn primary" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>导出 Excel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="tut-count">为您找到 0 条辅导备案公告</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>代码 / 简称</th>
+              <th>辅导阶段</th>
+              <th>公告标题（点击查看 PDF）</th>
+              <th>所属地区</th>
+              <th>行业</th>
+              <th>主办券商</th>
+              <th>公告日期</th>
+            </tr>
+          </thead>
+          <tbody id="tut-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="tut-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="30" selected>30 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="tut-page-info" class="page-info">第 1 / 1 页</span>
+          <button id="tut-prev-page" class="action-btn sm">上一页</button>
+          <button id="tut-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图 7：新三板挂牌（二期第2周已上线） -->
+    <section id="view-neeq" class="hidden">
+      <div id="neeq-kpi-grid" class="kpi-grid"></div>
+
+      <div class="filter-minimal">
+        <div class="filter-row">
+          <span class="filter-label">分层：</span>
+          <div id="neeq-tier-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="创新层">创新层</button>
+            <button class="chip-btn" data-val="基础层">基础层</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">交易：</span>
+          <div id="neeq-trade-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="集合竞价">集合竞价</button>
+            <button class="chip-btn" data-val="做市">做市</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">年份：</span>
+          <div id="neeq-year-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="2026">2026年</button>
+            <button class="chip-btn" data-val="2025">2025年</button>
+            <button class="chip-btn" data-val="2024">2024年</button>
+            <button class="chip-btn" data-val="2023">2023年</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-search-shell">
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="neeq-keyword" class="google-search-input" type="text" placeholder="搜索证券代码、公司简称、主办券商、行业或省份..." />
+            <button id="neeq-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
+          </div>
+          <button id="neeq-reset" class="action-btn" type="button">重置</button>
+          <button id="neeq-export-excel" class="action-btn primary" type="button">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>导出 Excel</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="neeq-count">为您找到 0 家新三板挂牌企业</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>代码 / 简称</th>
+              <th>市场分层</th>
+              <th>挂牌日期</th>
+              <th>所属地区</th>
+              <th>所属行业</th>
+              <th>主办券商</th>
+              <th>交易方式</th>
+              <th>总股本(万股)</th>
+              <th>每股收益(元)</th>
+            </tr>
+          </thead>
+          <tbody id="neeq-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="neeq-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="30" selected>30 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="neeq-page-info" class="page-info">第 1 / 1 页</span>
+          <button id="neeq-prev-page" class="action-btn sm">上一页</button>
+          <button id="neeq-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图 8：后续规划占位页 -->
     <section id="view-placeholder" class="hidden">
       <div class="placeholder-card">
         <h3 id="placeholder-title">后续规划模块</h3>
@@ -584,6 +766,8 @@
   <script src="./data/ipo_data.js"></script>
   <script src="./data/committee_data.js"></script>
   <script src="./data/issuance_data.js"></script>
+  <script src="./data/neeq_data.js"></script>
+  <script src="./data/tutoring_data.js"></script>
   <script src="./assets/app.js"></script>
 </body>
 </html>

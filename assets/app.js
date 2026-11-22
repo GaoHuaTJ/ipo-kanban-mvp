@@ -82,11 +82,14 @@
     activeRecords: [],  // 当前在审记录（全景图统计口径）
     committeeRecords: [], // 二期：上市委审议记录
     issuanceRecords: [],  // 二期：新股发行动态记录
+    tutoringRecords: [],  // 二期第2周：辅导备案公告
+    neeqRecords: [],      // 二期第2周：新三板挂牌企业
     currentDetailRec: null,
     activeTab: "全景图",
     previousTab: "审核动态",
     mapMode: "heatmap",
     rightOrgType: "law",
+    mergeOrgHQ: true,     // 全景图口径优化：默认合并分所至总所
     chinaMapLoaded: false,
     chinaMapFailed: false,
     detailCache: {},
@@ -111,6 +114,21 @@
     issFilters: {
       board: "全部",
       status: "全部",
+      year: "全部",
+      keyword: "",
+      page: 1,
+      pageSize: 30,
+    },
+    tutFilters: {
+      stage: "全部",
+      year: "全部",
+      keyword: "",
+      page: 1,
+      pageSize: 30,
+    },
+    neeqFilters: {
+      tier: "全部",
+      trade: "全部",
       year: "全部",
       keyword: "",
       page: 1,
@@ -198,11 +216,36 @@
       .sort((a, b) => b.value - a.value);
   }
 
+  // 总所归并口径：统一分所与行政区划前缀
+  function normalizeOrgToHQ(name) {
+    if (!name) return "";
+    let s = String(name).trim();
+    // 1. 去掉括号中的分所城市/组织形式（如 国浩律师（上海）事务所 -> 国浩律师事务所）
+    s = s.replace(/（[^）]*）|\([^)]*\)/g, "").trim();
+    // 2. 去掉末尾分所字样
+    s = s.replace(/(?:上海|北京|深圳|广州|杭州|南京|成都|武汉|苏州|重庆|天津|西安|长沙|福州|厦门|济南|青岛|合肥|郑州|昆明|大连|沈阳|宁波|无锡)?分所$/g, "").trim();
+    // 3. 对律师/会计师事务所去掉开头的省市前缀（避免误伤“上海证券/南京证券”）
+    if (s.includes("律师") || s.includes("会计师")) {
+      s = s.replace(/^(?:北京市|上海市|广东省|浙江省|江苏省|四川省|湖南省|福建省|山东省|安徽省|湖北省|陕西省|河南省|河北省|辽宁省|江西省|重庆市|天津市|深圳市|广州市|杭州市|南京市|成都市|苏州市|北京|上海|广东|浙江|江苏|四川|湖南|福建|山东|安徽|湖北|陕西|河南|河北|辽宁|江西|深圳|广州|杭州|南京|成都|苏州)/, "").trim();
+    }
+    return s || String(name).trim();
+  }
+
+  function extractOrgSearchKeyword(org) {
+    if (!state.mergeOrgHQ) return org;
+    const core = String(org || "").replace(/律师事务所$|会计师事务所$|事务所$/, "").trim();
+    return core.length >= 2 ? core : org;
+  }
+
   function getOrgStats(field, topN = 15) {
     const map = {};
     for (const r of state.activeRecords) {
-      for (const org of r[field] || []) {
-        if (!org) continue;
+      const seenInRecord = new Set();
+      for (const rawOrg of r[field] || []) {
+        if (!rawOrg) continue;
+        const org = state.mergeOrgHQ ? normalizeOrgToHQ(rawOrg) : rawOrg;
+        if (!org || seenInRecord.has(org)) continue;
+        seenInRecord.add(org);
         map[org] = (map[org] || 0) + 1;
       }
     }
@@ -447,11 +490,11 @@
 
   function renderOrgCharts() {
     sponsorChart = renderRankChart(sponsorChart, "sponsor-chart", getOrgStats("sponsors", 15), (org) => {
-      jumpToDynamics({ exchange: "全部", board: "全部", stage: "在审汇总", province: "全部", keyword: org });
+      jumpToDynamics({ exchange: "全部", board: "全部", stage: "在审汇总", province: "全部", keyword: extractOrgSearchKeyword(org) });
     });
     const rightField = state.rightOrgType === "law" ? "law_firms" : "accounting_firms";
     rightOrgChart = renderRankChart(rightOrgChart, "right-org-chart", getOrgStats(rightField, 15), (org) => {
-      jumpToDynamics({ exchange: "全部", board: "全部", stage: "在审汇总", province: "全部", keyword: org });
+      jumpToDynamics({ exchange: "全部", board: "全部", stage: "在审汇总", province: "全部", keyword: extractOrgSearchKeyword(org) });
     });
   }
 
@@ -768,6 +811,8 @@
     $("view-dynamics").classList.add("hidden");
     $("view-committee").classList.add("hidden");
     $("view-issuance").classList.add("hidden");
+    $("view-tutoring").classList.add("hidden");
+    $("view-neeq").classList.add("hidden");
     $("view-placeholder").classList.add("hidden");
     $("view-detail").classList.remove("hidden");
     switchDetailTab(defaultDetailTab);
@@ -1289,6 +1334,262 @@
     URL.revokeObjectURL(url);
   }
 
+  // ==================== 二期第2周：辅导备案 ====================
+  function updateTutoringChipCounts() {
+    const stCounts = {};
+    const yrCounts = {};
+    for (const r of state.tutoringRecords) {
+      stCounts[r.stage] = (stCounts[r.stage] || 0) + 1;
+      const yr = (r.notice_date || "").slice(0, 4);
+      if (yr) yrCounts[yr] = (yrCounts[yr] || 0) + 1;
+    }
+    document.querySelectorAll("#tut-stage-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${stCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#tut-year-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+    });
+  }
+
+  function getFilteredTutoring() {
+    const { stage, year, keyword } = state.tutFilters;
+    const kw = keyword.trim().toLowerCase();
+    return state.tutoringRecords.filter((r) => {
+      if (stage !== "全部" && r.stage !== stage) return false;
+      if (year !== "全部" && !(r.notice_date || "").startsWith(year)) return false;
+      if (kw) {
+        const hay = [r.code, r.abbr, r.title, r.broker, r.industry, r.province].join(" ").toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderTutoringKPI(filtered) {
+    const total = filtered.length;
+    const reg = filtered.filter((r) => r.stage === "辅导备案").length;
+    const prog = filtered.filter((r) => r.stage === "辅导进展").length;
+    const acc = filtered.filter((r) => r.stage === "辅导验收").length;
+
+    $("tutoring-kpi-grid").innerHTML = `
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">辅导公告总数</div>
+        <div class="kpi-value">${total.toLocaleString()}</div>
+        <div class="kpi-sub">官方公开披露最新辅导公告</div>
+      </div>
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">辅导备案 / 受理</div>
+        <div class="kpi-value">${reg}</div>
+        <div class="kpi-sub">占比 ${total ? ((reg / total) * 100).toFixed(1) : "0.0"}%</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">辅导进展报告</div>
+        <div class="kpi-value">${prog}</div>
+        <div class="kpi-sub">占比 ${total ? ((prog / total) * 100).toFixed(1) : "0.0"}%</div>
+      </div>
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">辅导验收通过</div>
+        <div class="kpi-value">${acc}</div>
+        <div class="kpi-sub">待申报上市企业储备</div>
+      </div>
+    `;
+  }
+
+  function renderTutoringTable() {
+    const filtered = getFilteredTutoring();
+    renderTutoringKPI(filtered);
+
+    const total = filtered.length;
+    const { pageSize } = state.tutFilters;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (state.tutFilters.page > totalPages) state.tutFilters.page = totalPages;
+
+    const start = (state.tutFilters.page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    $("tut-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 条辅导备案公告`;
+
+    const tbody = $("tut-tbody");
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的辅导公告</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows
+        .map((r, idx) => {
+          const stageClass = r.stage === "终止/撤回" ? "tut-终止" : `tut-${r.stage}`;
+          const titleHtml = r.pdf_url
+            ? `<a class="pdf-title-link" href="${escapeHtml(r.pdf_url)}" target="_blank" rel="noopener noreferrer"><span class="pdf-pill">PDF</span><span>${escapeHtml(r.title)}</span></a>`
+            : `<span>${escapeHtml(r.title)}</span>`;
+          return `
+            <tr>
+              <td><span class="row-index-badge">${start + idx + 1}</span></td>
+              <td style="white-space:nowrap;"><span class="stock-code-pill">${escapeHtml(r.code || "—")}</span><span class="company-link">${escapeHtml(r.abbr)}</span></td>
+              <td><span class="stage-tag ${stageClass}"><span class="status-dot"></span>${escapeHtml(r.stage)}</span></td>
+              <td style="max-width:420px;">${titleHtml}</td>
+              <td style="white-space:nowrap;color:#3c4043;">${escapeHtml((r.province || "—").replace(/省|市|维吾尔自治区|壮族自治区|回族自治区|自治区/g, ""))}</td>
+              <td style="color:#5f6368;">${escapeHtml(r.industry || "—")}</td>
+              <td style="color:#3c4043;white-space:nowrap;">${escapeHtml(r.broker || "—")}</td>
+              <td class="date-cell">${escapeHtml(r.notice_date || "—")}</td>
+            </tr>`;
+        })
+        .join("");
+    }
+
+    $("tut-page-info").textContent = `第 ${state.tutFilters.page} / ${totalPages} 页`;
+    $("tut-prev-page").disabled = state.tutFilters.page <= 1;
+    $("tut-next-page").disabled = state.tutFilters.page >= totalPages;
+  }
+
+  function exportTutoringExcel() {
+    const filtered = getFilteredTutoring();
+    const headers = ["序号", "证券代码", "公司简称", "辅导阶段", "公告标题", "所属地区", "行业", "主办券商", "公告日期", "PDF原文链接"];
+    const rows = filtered.map((r, idx) => [
+      idx + 1,
+      r.code,
+      r.abbr,
+      r.stage,
+      r.title,
+      r.province,
+      r.industry,
+      r.broker,
+      r.notice_date,
+      r.pdf_url,
+    ]);
+    exportGenericExcel(headers, rows, "辅导备案公告", `IPO辅导备案公告_${(state.meta && state.meta.update_date) || "export"}`);
+  }
+
+  // ==================== 二期第2周：新三板挂牌 ====================
+  function updateNeeqChipCounts() {
+    const tierCounts = {};
+    const tradeCounts = {};
+    const yrCounts = {};
+    for (const r of state.neeqRecords) {
+      tierCounts[r.tier] = (tierCounts[r.tier] || 0) + 1;
+      tradeCounts[r.trade_type] = (tradeCounts[r.trade_type] || 0) + 1;
+      const yr = (r.list_date || "").slice(0, 4);
+      if (yr) yrCounts[yr] = (yrCounts[yr] || 0) + 1;
+    }
+    document.querySelectorAll("#neeq-tier-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${tierCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#neeq-trade-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${tradeCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#neeq-year-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+    });
+  }
+
+  function getFilteredNeeq() {
+    const { tier, trade, year, keyword } = state.neeqFilters;
+    const kw = keyword.trim().toLowerCase();
+    return state.neeqRecords.filter((r) => {
+      if (tier !== "全部" && r.tier !== tier) return false;
+      if (trade !== "全部" && r.trade_type !== trade) return false;
+      if (year !== "全部" && !(r.list_date || "").startsWith(year)) return false;
+      if (kw) {
+        const hay = [r.code, r.abbr, r.broker, r.industry, r.province].join(" ").toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderNeeqKPI(filtered) {
+    const total = filtered.length;
+    const innov = filtered.filter((r) => r.tier === "创新层").length;
+    const base = filtered.filter((r) => r.tier === "基础层").length;
+    const provs = new Set(filtered.map((r) => r.province).filter((p) => p && p !== "—")).size;
+
+    $("neeq-kpi-grid").innerHTML = `
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">新挂牌企业数</div>
+        <div class="kpi-value">${total.toLocaleString()}</div>
+        <div class="kpi-sub">全国股转系统（2023年至今）</div>
+      </div>
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">创新层企业</div>
+        <div class="kpi-value">${innov}</div>
+        <div class="kpi-sub">占比 ${total ? ((innov / total) * 100).toFixed(1) : "0.0"}%（北交所后备主力）</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">基础层企业</div>
+        <div class="kpi-value">${base}</div>
+        <div class="kpi-sub">占比 ${total ? ((base / total) * 100).toFixed(1) : "0.0"}%</div>
+      </div>
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">覆盖省市自治区</div>
+        <div class="kpi-value">${provs}</div>
+        <div class="kpi-sub">全国股转直连实时汇总</div>
+      </div>
+    `;
+  }
+
+  function renderNeeqTable() {
+    const filtered = getFilteredNeeq();
+    renderNeeqKPI(filtered);
+
+    const total = filtered.length;
+    const { pageSize } = state.neeqFilters;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (state.neeqFilters.page > totalPages) state.neeqFilters.page = totalPages;
+
+    const start = (state.neeqFilters.page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    $("neeq-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 家新三板挂牌企业`;
+
+    const tbody = $("neeq-tbody");
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的新三板挂牌企业</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows
+        .map(
+          (r, idx) => `
+          <tr>
+            <td><span class="row-index-badge">${start + idx + 1}</span></td>
+            <td style="white-space:nowrap;"><span class="stock-code-pill">${escapeHtml(r.code)}</span><span class="company-link">${escapeHtml(r.abbr)}</span></td>
+            <td><span class="board-tag tier-${escapeHtml(r.tier)}">${escapeHtml(r.tier)}</span></td>
+            <td class="date-cell">${escapeHtml(r.list_date || "—")}</td>
+            <td style="white-space:nowrap;color:#3c4043;">${escapeHtml((r.province || "—").replace(/省|市|维吾尔自治区|壮族自治区|回族自治区|自治区/g, ""))}</td>
+            <td style="color:#5f6368;">${escapeHtml(r.industry || "—")}</td>
+            <td style="color:#3c4043;white-space:nowrap;">${escapeHtml(r.broker || "—")}</td>
+            <td style="white-space:nowrap;color:#5f6368;">${escapeHtml(r.trade_type || "—")}</td>
+            <td class="num-cell">${r.total_shares_wan !== null && r.total_shares_wan !== undefined ? r.total_shares_wan.toLocaleString() : "—"}</td>
+            <td class="num-cell">${r.eps !== null && r.eps !== undefined ? r.eps.toFixed(2) : "—"}</td>
+          </tr>`
+        )
+        .join("");
+    }
+
+    $("neeq-page-info").textContent = `第 ${state.neeqFilters.page} / ${totalPages} 页`;
+    $("neeq-prev-page").disabled = state.neeqFilters.page <= 1;
+    $("neeq-next-page").disabled = state.neeqFilters.page >= totalPages;
+  }
+
+  function exportNeeqExcel() {
+    const filtered = getFilteredNeeq();
+    const headers = ["序号", "证券代码", "证券简称", "市场分层", "挂牌日期", "所属地区", "所属行业", "主办券商", "交易方式", "总股本(万股)", "每股收益(元)"];
+    const rows = filtered.map((r, idx) => [
+      idx + 1,
+      r.code,
+      r.abbr,
+      r.tier,
+      r.list_date,
+      r.province,
+      r.industry,
+      r.broker,
+      r.trade_type,
+      r.total_shares_wan ?? "",
+      r.eps ?? "",
+    ]);
+    exportGenericExcel(headers, rows, "新三板挂牌", `新三板挂牌清单_${(state.meta && state.meta.update_date) || "export"}`);
+  }
+
   function switchSubTab(tabName) {
     state.activeTab = tabName;
     $("view-detail").classList.add("hidden");
@@ -1300,8 +1601,10 @@
     $("view-dynamics").classList.toggle("hidden", tabName !== "审核动态");
     $("view-committee").classList.toggle("hidden", tabName !== "上市委审议");
     $("view-issuance").classList.toggle("hidden", tabName !== "发行动态");
+    $("view-tutoring").classList.toggle("hidden", tabName !== "辅导备案");
+    $("view-neeq").classList.toggle("hidden", tabName !== "新三板挂牌");
 
-    const builtTabs = new Set(["全景图", "审核动态", "上市委审议", "发行动态"]);
+    const builtTabs = new Set(["全景图", "审核动态", "上市委审议", "发行动态", "辅导备案", "新三板挂牌"]);
     const placeholder = $("view-placeholder");
     if (!builtTabs.has(tabName)) {
       const info = FUTURE_TAB_INFO[tabName] || { title: tabName, desc: "后续规划接入", source: "" };
@@ -1360,6 +1663,14 @@
         renderOrgCharts();
       });
     });
+
+    const hqToggle = $("toggle-hq-merge");
+    if (hqToggle) {
+      hqToggle.addEventListener("change", (e) => {
+        state.mergeOrgHQ = e.target.checked;
+        renderOrgCharts();
+      });
+    }
 
     document.querySelectorAll("#filter-exchange-chips .chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1520,6 +1831,74 @@
     $("iss-prev-page").addEventListener("click", () => { if (state.issFilters.page > 1) { state.issFilters.page -= 1; renderIssuanceTable(); } });
     $("iss-next-page").addEventListener("click", () => { state.issFilters.page += 1; renderIssuanceTable(); });
 
+    // ==================== 二期第2周：辅导备案事件绑定 ====================
+    const syncTutUI = () => {
+      document.querySelectorAll("#tut-stage-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.tutFilters.stage));
+      document.querySelectorAll("#tut-year-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.tutFilters.year));
+      $("tut-keyword").value = state.tutFilters.keyword;
+      $("tut-clear-search").classList.toggle("hidden", !state.tutFilters.keyword);
+    };
+
+    document.querySelectorAll("#tut-stage-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.tutFilters.stage = btn.dataset.val; state.tutFilters.page = 1; syncTutUI(); renderTutoringTable(); });
+    });
+    document.querySelectorAll("#tut-year-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.tutFilters.year = btn.dataset.val; state.tutFilters.page = 1; syncTutUI(); renderTutoringTable(); });
+    });
+    $("tut-keyword").addEventListener("input", (e) => {
+      state.tutFilters.keyword = e.target.value; state.tutFilters.page = 1;
+      $("tut-clear-search").classList.toggle("hidden", !state.tutFilters.keyword);
+      renderTutoringTable();
+    });
+    $("tut-clear-search").addEventListener("click", () => {
+      state.tutFilters.keyword = ""; state.tutFilters.page = 1; syncTutUI(); renderTutoringTable(); $("tut-keyword").focus();
+    });
+    $("tut-reset").addEventListener("click", () => {
+      const sz = state.tutFilters.pageSize;
+      state.tutFilters = { stage: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
+      syncTutUI(); renderTutoringTable();
+    });
+    $("tut-export-excel").addEventListener("click", exportTutoringExcel);
+    $("tut-page-size").addEventListener("change", (e) => { state.tutFilters.pageSize = Number(e.target.value) || 30; state.tutFilters.page = 1; renderTutoringTable(); });
+    $("tut-prev-page").addEventListener("click", () => { if (state.tutFilters.page > 1) { state.tutFilters.page -= 1; renderTutoringTable(); } });
+    $("tut-next-page").addEventListener("click", () => { state.tutFilters.page += 1; renderTutoringTable(); });
+
+    // ==================== 二期第2周：新三板挂牌事件绑定 ====================
+    const syncNeeqUI = () => {
+      document.querySelectorAll("#neeq-tier-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.neeqFilters.tier));
+      document.querySelectorAll("#neeq-trade-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.neeqFilters.trade));
+      document.querySelectorAll("#neeq-year-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.neeqFilters.year));
+      $("neeq-keyword").value = state.neeqFilters.keyword;
+      $("neeq-clear-search").classList.toggle("hidden", !state.neeqFilters.keyword);
+    };
+
+    document.querySelectorAll("#neeq-tier-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.neeqFilters.tier = btn.dataset.val; state.neeqFilters.page = 1; syncNeeqUI(); renderNeeqTable(); });
+    });
+    document.querySelectorAll("#neeq-trade-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.neeqFilters.trade = btn.dataset.val; state.neeqFilters.page = 1; syncNeeqUI(); renderNeeqTable(); });
+    });
+    document.querySelectorAll("#neeq-year-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.neeqFilters.year = btn.dataset.val; state.neeqFilters.page = 1; syncNeeqUI(); renderNeeqTable(); });
+    });
+    $("neeq-keyword").addEventListener("input", (e) => {
+      state.neeqFilters.keyword = e.target.value; state.neeqFilters.page = 1;
+      $("neeq-clear-search").classList.toggle("hidden", !state.neeqFilters.keyword);
+      renderNeeqTable();
+    });
+    $("neeq-clear-search").addEventListener("click", () => {
+      state.neeqFilters.keyword = ""; state.neeqFilters.page = 1; syncNeeqUI(); renderNeeqTable(); $("neeq-keyword").focus();
+    });
+    $("neeq-reset").addEventListener("click", () => {
+      const sz = state.neeqFilters.pageSize;
+      state.neeqFilters = { tier: "全部", trade: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
+      syncNeeqUI(); renderNeeqTable();
+    });
+    $("neeq-export-excel").addEventListener("click", exportNeeqExcel);
+    $("neeq-page-size").addEventListener("change", (e) => { state.neeqFilters.pageSize = Number(e.target.value) || 30; state.neeqFilters.page = 1; renderNeeqTable(); });
+    $("neeq-prev-page").addEventListener("click", () => { if (state.neeqFilters.page > 1) { state.neeqFilters.page -= 1; renderNeeqTable(); } });
+    $("neeq-next-page").addEventListener("click", () => { state.neeqFilters.page += 1; renderNeeqTable(); });
+
     window.addEventListener("resize", () => {
       if (mapChart) mapChart.resize();
       if (sponsorChart) sponsorChart.resize();
@@ -1530,10 +1909,12 @@
   async function init() {
     bindEvents();
     try {
-      const [payload, cmPayload, issPayload] = await Promise.all([
+      const [payload, cmPayload, issPayload, tutPayload, neeqPayload] = await Promise.all([
         loadData(),
         loadJsonWithFallback("./data/committee_data.json", window.__COMMITTEE_DATA__),
         loadJsonWithFallback("./data/issuance_data.json", window.__ISSUANCE_DATA__),
+        loadJsonWithFallback("./data/tutoring_data.json", window.__TUTORING_DATA__),
+        loadJsonWithFallback("./data/neeq_data.json", window.__NEEQ_DATA__),
       ]);
 
       state.meta = payload.meta || {};
@@ -1541,6 +1922,8 @@
       state.activeRecords = state.records.filter((r) => r.is_active !== false);
       state.committeeRecords = (cmPayload && cmPayload.records) || [];
       state.issuanceRecords = (issPayload && issPayload.records) || [];
+      state.tutoringRecords = (tutPayload && tutPayload.records) || [];
+      state.neeqRecords = (neeqPayload && neeqPayload.records) || [];
 
       updateHeaderMeta();
       renderMatrix();
@@ -1553,6 +1936,10 @@
       renderCommitteeTable();
       updateIssuanceChipCounts();
       renderIssuanceTable();
+      updateTutoringChipCounts();
+      renderTutoringTable();
+      updateNeeqChipCounts();
+      renderNeeqTable();
 
       await renderMapOrBar();
     } catch (err) {
