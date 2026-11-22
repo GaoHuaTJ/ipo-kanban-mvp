@@ -1539,6 +1539,7 @@
       "辅导验收": 0,
       "未受理": 0,
       "已受理": 0,
+      "撤回后重新报辅导": 0,
       "辅导终止": 0,
     };
     const brCounts = {};
@@ -1554,6 +1555,7 @@
         stageCounts["辅导终止"] += 1;
       }
       if (r.ipo_accepted) stageCounts["已受理"] += 1;
+      if (r.re_tutoring) stageCounts["撤回后重新报辅导"] += 1;
       if (r.bureau && r.bureau !== "—") {
         brCounts[r.bureau] = (brCounts[r.bureau] || 0) + 1;
       }
@@ -1606,6 +1608,8 @@
           if (!(st === "辅导验收" && !r.ipo_accepted)) return false;
         } else if (stage === "已受理") {
           if (!r.ipo_accepted) return false;
+        } else if (stage === "撤回后重新报辅导") {
+          if (!r.re_tutoring) return false;
         } else if (st !== stage) {
           return false;
         }
@@ -1626,6 +1630,7 @@
           r.bureau,
           r.industry,
           r.report_title,
+          r.prev_filing,
         ]
           .join(" ")
           .toLowerCase();
@@ -1674,9 +1679,12 @@
           const board = r.board || "沪深";
           let statusInlineBadge = "";
           if (r.ipo_accepted) {
-            statusInlineBadge = `<span class="tut-inline-badge accepted">已受理</span>`;
+            statusInlineBadge += `<span class="tut-inline-badge accepted">已受理</span>`;
           } else if (st === "辅导验收") {
-            statusInlineBadge = `<span class="tut-inline-badge">尚未受理</span>`;
+            statusInlineBadge += `<span class="tut-inline-badge">尚未受理</span>`;
+          }
+          if (r.re_tutoring) {
+            statusInlineBadge += `<span class="tut-inline-badge retutor">撤回后重新报辅导</span>`;
           }
           const lawShort = r.law_firm_short && r.law_firm_short !== "—" ? r.law_firm_short : "—";
           const acctShort = r.acct_firm_short && r.acct_firm_short !== "—" ? r.acct_firm_short : "—";
@@ -1927,6 +1935,9 @@
     } else {
       stageBadge.textContent = "尚未验收";
     }
+    if ($("tut-detail-retutor-badge")) {
+      $("tut-detail-retutor-badge").classList.toggle("hidden", !rec.re_tutoring);
+    }
 
     $("tut-detail-source-text").textContent = `${rec.bureau || "证监会"} · 辅导公示直连`;
     $("tut-detail-notice").classList.add("hidden");
@@ -1981,7 +1992,10 @@
     const rows = filtered.map((r, idx) => [
       idx + 1,
       r.company,
-      r.ipo_accepted ? "已受理" : (r.stage === "辅导验收" ? "尚未受理" : "未受理"),
+      [
+        r.ipo_accepted ? "已受理" : (r.stage === "辅导验收" ? "尚未受理" : "未受理"),
+        r.re_tutoring ? "撤回后重新报辅导" : "",
+      ].filter(Boolean).join(" / "),
       r.board || "沪深",
       r.stage || r.status,
       r.sponsor,

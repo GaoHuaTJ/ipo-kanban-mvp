@@ -658,8 +658,10 @@ def _load_cross_reference_maps(data_dir):
                 ipo_recs = json.load(f).get("records") or []
             for r in ipo_recs:
                 k = normalize_name(r.get("company"))
-                if k and k not in ipo_map:
-                    ipo_map[k] = r
+                if k:
+                    ipo_map.setdefault(k, []).append(r)
+            for k in ipo_map:
+                ipo_map[k].sort(key=lambda x: (x.get("accept_date") or "", x.get("update_date") or ""), reverse=True)
         except Exception:
             pass
 
@@ -845,14 +847,32 @@ def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120, repar
         _compute_stage_and_milestones(rec)
 
         norm_c = normalize_name(rec["company"])
-        ipo_hit = ipo_map.get(norm_c)
-        rec["ipo_accepted"] = bool(ipo_hit)
+        ipo_hits = ipo_map.get(norm_c) or []
+        ipo_hit = ipo_hits[0] if ipo_hits else None
 
-        # 板块先根据自身/报告标题推断，再用 IPO 在审库纠正
+        current_accepted_hit = None
+        terminated_hits = []
+        for h in ipo_hits:
+            if (h.get("stage") or "") != "终止":
+                current_accepted_hit = h
+                break
+            terminated_hits.append(h)
+
+        rec["ipo_accepted"] = bool(current_accepted_hit)
+        rec["re_tutoring"] = bool(not current_accepted_hit and terminated_hits)
+
+        if terminated_hits:
+            th = terminated_hits[0]
+            acc_s = f"{th.get('accept_date')} " if th.get("accept_date") else ""
+            upd_s = f"，{th.get('update_date')} " if th.get("update_date") else "，"
+            raw_st = th.get("raw_status") or "终止"
+            rec["prev_filing"] = f"{acc_s}曾申报{th.get('exchange') or ''}{th.get('board') or ''}{upd_s}{raw_st}"
+
+        # 板块先根据自身/报告标题推断，若当前在审则以在审板块为准
         all_titles = " ".join([r.get("title", "") for r in rec.get("reports", [])])
         inferred_board = infer_board_from_text(all_titles, default=rec.get("board") or "沪深")
-        if ipo_hit:
-            inferred_board = "北证" if ipo_hit.get("board") == "北证" else "沪深"
+        if current_accepted_hit:
+            inferred_board = "北证" if current_accepted_hit.get("board") == "北证" else "沪深"
         rec["board"] = inferred_board
 
         if ipo_hit:
@@ -955,6 +975,8 @@ def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120, repar
     # 6. 确保输出字段整齐、简洁、兼容前端渲染
     for rec in all_records:
         rec.setdefault("board", "沪深")
+        rec.setdefault("ipo_accepted", False)
+        rec.setdefault("re_tutoring", False)
         rec.setdefault("law_firm", "—")
         rec["law_firm_short"] = rec.get("law_firm_short") or shorten_law_firm(rec["law_firm"])
         rec.setdefault("acct_firm", "—")
