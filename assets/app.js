@@ -2329,7 +2329,7 @@
       renderDynamicsTable();
     });
 
-    $("btn-export-excel").addEventListener("click", exportFilteredExcel);
+    if ($("btn-export-excel")) $("btn-export-excel").addEventListener("click", exportFilteredExcel);
 
     $("btn-prev-page").addEventListener("click", () => {
       if (state.filters.page > 1) {
@@ -2374,7 +2374,7 @@
       state.cmFilters = { board: "全部", result: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
       syncCmUI(); renderCommitteeTable();
     });
-    $("cm-export-excel").addEventListener("click", exportCommitteeExcel);
+    if ($("cm-export-excel")) $("cm-export-excel").addEventListener("click", exportCommitteeExcel);
     $("cm-page-size").addEventListener("change", (e) => { state.cmFilters.pageSize = Number(e.target.value) || 30; state.cmFilters.page = 1; renderCommitteeTable(); });
     $("cm-prev-page").addEventListener("click", () => { if (state.cmFilters.page > 1) { state.cmFilters.page -= 1; renderCommitteeTable(); } });
     $("cm-next-page").addEventListener("click", () => { state.cmFilters.page += 1; renderCommitteeTable(); });
@@ -2410,7 +2410,7 @@
       state.issFilters = { board: "全部", status: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
       syncIssUI(); renderIssuanceTable();
     });
-    $("iss-export-excel").addEventListener("click", exportIssuanceExcel);
+    if ($("iss-export-excel")) $("iss-export-excel").addEventListener("click", exportIssuanceExcel);
     $("iss-page-size").addEventListener("change", (e) => { state.issFilters.pageSize = Number(e.target.value) || 30; state.issFilters.page = 1; renderIssuanceTable(); });
     $("iss-prev-page").addEventListener("click", () => { if (state.issFilters.page > 1) { state.issFilters.page -= 1; renderIssuanceTable(); } });
     $("iss-next-page").addEventListener("click", () => { state.issFilters.page += 1; renderIssuanceTable(); });
@@ -2491,7 +2491,7 @@
       };
       syncTutUI(); renderTutoringTable();
     });
-    $("tut-export-excel").addEventListener("click", exportTutoringExcel);
+    if ($("tut-export-excel")) $("tut-export-excel").addEventListener("click", exportTutoringExcel);
     $("tut-page-size").addEventListener("change", (e) => { state.tutFilters.pageSize = Number(e.target.value) || 30; state.tutFilters.page = 1; renderTutoringTable(); });
     $("tut-prev-page").addEventListener("click", () => { if (state.tutFilters.page > 1) { state.tutFilters.page -= 1; renderTutoringTable(); } });
     $("tut-next-page").addEventListener("click", () => { state.tutFilters.page += 1; renderTutoringTable(); });
@@ -2527,7 +2527,7 @@
       state.neeqFilters = { tier: "全部", trade: "全部", year: "全部", keyword: "", page: 1, pageSize: sz };
       syncNeeqUI(); renderNeeqTable();
     });
-    $("neeq-export-excel").addEventListener("click", exportNeeqExcel);
+    if ($("neeq-export-excel")) $("neeq-export-excel").addEventListener("click", exportNeeqExcel);
     $("neeq-page-size").addEventListener("change", (e) => { state.neeqFilters.pageSize = Number(e.target.value) || 30; state.neeqFilters.page = 1; renderNeeqTable(); });
     $("neeq-prev-page").addEventListener("click", () => { if (state.neeqFilters.page > 1) { state.neeqFilters.page -= 1; renderNeeqTable(); } });
     $("neeq-next-page").addEventListener("click", () => { state.neeqFilters.page += 1; renderNeeqTable(); });

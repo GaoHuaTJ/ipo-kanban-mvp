@@ -740,8 +740,11 @@ body {
   color: #fff;
 }
 
-.action-btn.primary:hover {
+.action-btn.primary:hover,
+.action-btn.primary.active-toggle {
   background: var(--g-blue-hover);
+  border-color: var(--g-blue-hover);
+  color: #fff;
   box-shadow: 0 1px 4px rgba(26, 115, 232, 0.35);
 }
 
