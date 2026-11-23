@@ -776,28 +776,36 @@ def fetch_tutoring_records(data_dir, backfill=False, parse_pdfs_limit=120, repar
                     prev["record_date"] = item["record_date"]
 
     # 2. 抓取默认全量 60 页
-    first_html = fetch_page_html(1)
-    m_total = re.search(r"共\s*<b>\s*(\d+)\s*</b>\s*页", first_html)
-    total_pages = min(int(m_total.group(1)), 60) if m_total else 60
-
     fresh_companies = set()
-    for pg in range(1, total_pages + 1):
-        if pg > 1:
-            time.sleep(0.1)
-            try:
-                page_html = fetch_page_html(pg)
-            except urllib.error.HTTPError as exc:
-                if exc.code == 404:
-                    break
-                raise
-        else:
-            page_html = first_html
-        rows = _parse_csrc_page_rows(page_html)
-        for r in rows:
-            fresh_companies.add(r["company"])
-        merge_parsed_items(rows)
+    try:
+        first_html = fetch_page_html(1)
+        m_total = re.search(r"共\s*<b>\s*(\d+)\s*</b>\s*页", first_html)
+        total_pages = min(int(m_total.group(1)), 60) if m_total else 60
 
-    print(f"[tutoring] 官网默认列表（{total_pages} 页）抓取完成，本轮覆盖 {len(fresh_companies)} 家")
+        for pg in range(1, total_pages + 1):
+            if pg > 1:
+                time.sleep(0.1)
+                try:
+                    page_html = fetch_page_html(pg)
+                except urllib.error.HTTPError as exc:
+                    if exc.code == 404:
+                        break
+                    raise
+            else:
+                page_html = first_html
+            rows = _parse_csrc_page_rows(page_html)
+            for r in rows:
+                fresh_companies.add(r["company"])
+            merge_parsed_items(rows)
+
+        print(f"[tutoring] 官网默认列表（{total_pages} 页）抓取完成，本轮覆盖 {len(fresh_companies)} 家")
+    except Exception as exc:
+        if merged_map:
+            print(f"[tutoring][WARN] eid.csrc.gov.cn 直连受限 ({exc})，使用存量 {len(merged_map)} 家企业基线执行最新交叉比对与状态同步")
+            backfill = False
+            parse_pdfs_limit = 0
+        else:
+            raise
 
     # 3. 可选历史时间切片回溯（POST index_f.html / index_{pg}_f.html）
     if backfill:
