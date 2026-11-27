@@ -3780,16 +3780,11 @@
     const msgBox = $("ai-messages");
     const inputEl = $("ai-input");
     const sendBtn = $("ai-send-btn");
-    const keyPanel = $("ai-key-panel");
-    const keyInput = $("ai-key-input");
     const ctxBar = $("ai-context-bar");
     if (!drawer || !msgBox) return;
 
-    const STORAGE_KEY = "ipoflow_zhipu_key";
     let chatHistory = [];
     let isBusy = false;
-
-    if (keyInput) keyInput.value = localStorage.getItem(STORAGE_KEY) || "";
 
     const countBy = (arr, fn) => {
       const m = {};
@@ -3984,18 +3979,12 @@
         const resp = await fetch("/api/ai-chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: apiMessages,
-            apiKey: localStorage.getItem(STORAGE_KEY) || "",
-          }),
+          body: JSON.stringify({ messages: apiMessages }),
         });
         const data = await resp.json();
         loadingEl.remove();
         if (!resp.ok || !data.ok) {
-          if (data && data.needKey && keyPanel) {
-            keyPanel.classList.remove("hidden");
-          }
-          appendMsg("assistant", `⚠️ ${data.error || "调用 GLM-4-Flash 失败，请检查配置。"}`);
+          appendMsg("assistant", `⚠️ ${data.error || "AI 服务暂时不可用，请稍后再试。"}`);
           chatHistory.pop();
           return;
         }
@@ -4020,18 +4009,6 @@
         chatHistory = [];
         msgBox.innerHTML = "";
         showWelcome();
-      });
-    }
-    if ($("ai-btn-key") && keyPanel) {
-      $("ai-btn-key").addEventListener("click", () => keyPanel.classList.toggle("hidden"));
-    }
-    if ($("ai-key-save") && keyInput) {
-      $("ai-key-save").addEventListener("click", () => {
-        const val = keyInput.value.trim();
-        if (val) localStorage.setItem(STORAGE_KEY, val);
-        else localStorage.removeItem(STORAGE_KEY);
-        keyPanel.classList.add("hidden");
-        appendMsg("assistant", val ? "✅ 已保存智谱免费 API Key（仅存于当前浏览器），现在可直接提问！" : "已清空本地 API Key。");
       });
     }
     document.querySelectorAll(".ai-quick-chip").forEach((chip) => {

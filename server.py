@@ -608,16 +608,9 @@ class IpoKanbanHandler(SimpleHTTPRequestHandler):
             self.send_json(400, {"ok": False, "error": "缺少 messages 对话内容"})
             return
 
-        api_key = os.environ.get("ZHIPU_API_KEY", "").strip() or str((body or {}).get("apiKey") or "").strip()
+        api_key = os.environ.get("ZHIPU_API_KEY", "").strip()
         if not api_key:
-            self.send_json(
-                401,
-                {
-                    "ok": False,
-                    "needKey": True,
-                    "error": "尚未配置智谱 GLM-4-Flash 免费 API Key，请在右侧面板设置或启动服务时设置 ZHIPU_API_KEY。",
-                },
-            )
+            self.send_json(503, {"ok": False, "error": "AI 服务尚未配置：请以 ZHIPU_API_KEY=<你的Key> python3 server.py 启动。"})
             return
 
         try:

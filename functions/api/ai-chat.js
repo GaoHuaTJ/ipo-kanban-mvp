@@ -42,19 +42,10 @@ export async function onRequestPost(context) {
       return jsonResp({ ok: false, error: "缺少 messages 对话内容" }, 400);
     }
 
-    const envKey = context.env && context.env.ZHIPU_API_KEY ? String(context.env.ZHIPU_API_KEY).trim() : "";
-    const clientKey = body && body.apiKey ? String(body.apiKey).trim() : "";
-    const apiKey = envKey || clientKey;
+    const apiKey = context.env && context.env.ZHIPU_API_KEY ? String(context.env.ZHIPU_API_KEY).trim() : "";
 
     if (!apiKey) {
-      return jsonResp(
-        {
-          ok: false,
-          needKey: true,
-          error: "尚未配置智谱 GLM-4-Flash 免费 API Key，请在右上角设置或 Cloudflare Pages 环境变量中配置 ZHIPU_API_KEY。",
-        },
-        401
-      );
+      return jsonResp({ ok: false, error: "AI 服务尚未配置，请联系站点管理员。" }, 503);
     }
 
     const upstream = await fetch(ZHIPU_ENDPOINT, {
