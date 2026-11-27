@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>IPO 智览 · 正在跳转...</title>
+  <script>
+    (function () {
+      var l = window.location;
+      var path = l.pathname || "/";
+      var prefix = path.indexOf("/ipoflow/") === 0 || path === "/ipoflow" ? "/ipoflow" : "";
+      var subPath = prefix ? path.slice(prefix.length) : path;
+      if (!subPath || subPath.charAt(0) !== "/") subPath = "/" + subPath;
+      var target = l.protocol + "//" + l.host + prefix + "/?p=" + encodeURIComponent(subPath + (l.search || "")) + (l.hash || "");
+      l.replace(target);
+    })();
+  </script>
+</head>
+<body></body>
+</html>

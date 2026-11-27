@@ -565,6 +565,10 @@ class IpoKanbanHandler(SimpleHTTPRequestHandler):
         if parsed.path == "/api/tutoring-detail":
             self.handle_tutoring_detail(parsed.query)
             return
+        if parsed.path.startswith("/ipo-review"):
+            rel = parsed.path.lstrip("/")
+            if not rel or not os.path.isfile(os.path.join(os.getcwd(), rel)):
+                self.path = "/index.html"
         super().do_GET()
 
     def handle_tutoring_detail(self, query_str):

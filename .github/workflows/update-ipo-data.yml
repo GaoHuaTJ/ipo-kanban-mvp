@@ -28,17 +28,18 @@ jobs:
       - name: 安装 PDF 解析依赖
         run: python3 -m pip install pypdf
 
-      - name: 抓取最新 A股IPO 在审、上市委审议、发行动态、新三板挂牌与辅导备案数据
+      - name: 抓取最新 A股IPO 在审、上市委审议、发行动态、新三板挂牌、辅导备案、现场检查与监管措施数据
         run: |
           python3 scripts/fetch_ipo_data.py --source eastmoney
           python3 scripts/fetch_phase2_data.py
           python3 scripts/fetch_phase2_w2.py --soft-fail
+          python3 scripts/fetch_phase3_data.py --soft-fail
 
       - name: 提交并推送更新后的数据文件
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/ipo_data.json data/ipo_data.js data/committee_data.json data/committee_data.js data/issuance_data.json data/issuance_data.js data/neeq_data.json data/neeq_data.js data/tutoring_data.json data/tutoring_data.js data/tutoring_reports
+          git add data/ipo_data.json data/ipo_data.js data/committee_data.json data/committee_data.js data/issuance_data.json data/issuance_data.js data/neeq_data.json data/neeq_data.js data/tutoring_data.json data/tutoring_data.js data/tutoring_reports data/inspection_data.json data/inspection_data.js data/regulatory_data.json data/regulatory_data.js
           if git diff --cached --quiet; then
             echo "数据无变化，跳过提交"
           else

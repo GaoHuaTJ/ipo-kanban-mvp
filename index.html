@@ -3,11 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <script>
+    (function () {
+      var p = window.location.pathname || "/";
+      var b = document.createElement("base");
+      if (window.location.protocol === "file:") {
+        b.href = p.replace(/[^/]*$/, "");
+      } else if (p === "/ipoflow" || p.indexOf("/ipoflow/") === 0) {
+        b.href = "/ipoflow/";
+      } else {
+        b.href = "/";
+      }
+      document.head.appendChild(b);
+    })();
+  </script>
   <title>IPO 智览 · 首发上市全景看板</title>
   <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
   <link rel="stylesheet" href="./assets/styles.css" />
-  <script src="./assets/vendor/echarts.min.js"></script>
-  <script src="./assets/vendor/xlsx.full.min.js"></script>
 </head>
 <body>
   <!-- 顶部导航栏 -->
@@ -792,6 +804,173 @@
       </div>
     </section>
 
+    <!-- 视图 8A：现场检查（三期） -->
+    <section id="view-inspection" class="hidden">
+      <div id="insp-kpi-grid" class="kpi-grid"></div>
+
+      <div class="filter-minimal">
+        <div class="filter-row">
+          <span class="filter-label">抽签板块：</span>
+          <div id="insp-board-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="主板">主板</button>
+            <button class="chip-btn" data-val="科创板">科创板</button>
+            <button class="chip-btn" data-val="创业板">创业板</button>
+            <button class="chip-btn" data-val="北证">北证</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">审核状态：</span>
+          <div id="insp-stage-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="受理">受理</button>
+            <button class="chip-btn" data-val="问询">问询</button>
+            <button class="chip-btn" data-val="上市委">上市委</button>
+            <button class="chip-btn" data-val="提交注册">提交注册</button>
+            <button class="chip-btn" data-val="注册同意">注册同意</button>
+            <button class="chip-btn" data-val="中止">中止</button>
+            <button class="chip-btn" data-val="终止">终止</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-search-shell">
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="insp-keyword" class="google-search-input" type="text" placeholder="搜索抽中企业名称、保荐机构、抽签批次..." />
+            <button id="insp-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
+          </div>
+          <button id="insp-reset" class="action-btn primary" type="button">重置</button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="insp-count">为您找到 0 条现场检查抽查记录</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>抽签日期</th>
+              <th>抽中企业</th>
+              <th>抽签批次</th>
+              <th>抽签比例</th>
+              <th>审核状态</th>
+              <th>交易所</th>
+              <th>申报板块</th>
+              <th>保荐机构</th>
+              <th>受理时间</th>
+            </tr>
+          </thead>
+          <tbody id="insp-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="insp-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="30" selected>30 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="insp-page-info" class="page-info">第 1 / 1 页</span>
+          <button id="insp-prev-page" class="action-btn sm">上一页</button>
+          <button id="insp-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 视图 8B：监管措施（三期） -->
+    <section id="view-regulatory" class="hidden">
+      <div id="reg-kpi-grid" class="kpi-grid"></div>
+
+      <div class="filter-minimal">
+        <div class="filter-row">
+          <span class="filter-label">监管机构：</span>
+          <div id="reg-org-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="证监会">证监会</button>
+            <button class="chip-btn" data-val="上交所">上交所</button>
+            <button class="chip-btn" data-val="深交所">深交所</button>
+            <button class="chip-btn" data-val="北交所">北交所</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">审核状态：</span>
+          <div id="reg-stage-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="受理">受理</button>
+            <button class="chip-btn" data-val="问询">问询</button>
+            <button class="chip-btn" data-val="上市委">上市委</button>
+            <button class="chip-btn" data-val="提交注册">提交注册</button>
+            <button class="chip-btn" data-val="注册同意">注册同意</button>
+            <button class="chip-btn" data-val="中止">中止</button>
+            <button class="chip-btn" data-val="终止">终止</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-search-shell">
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="reg-keyword" class="google-search-input" type="text" placeholder="查询IPO项目、处罚对象、监管文书标题..." />
+            <button id="reg-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
+          </div>
+          <button id="reg-reset" class="action-btn primary" type="button">重置</button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="reg-count">为您找到 0 条监管措施记录</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>处罚对象</th>
+              <th>涉及IPO项目</th>
+              <th>审核状态</th>
+              <th>监管机构</th>
+              <th>处罚类别</th>
+              <th>公告日期</th>
+            </tr>
+          </thead>
+          <tbody id="reg-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="reg-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="30" selected>30 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="reg-page-info" class="page-info">第 1 / 1 页</span>
+          <button id="reg-prev-page" class="action-btn sm">上一页</button>
+          <button id="reg-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
     <!-- 视图 8：后续规划占位页 -->
     <section id="view-placeholder" class="hidden">
       <div class="placeholder-card">
@@ -802,12 +981,7 @@
     </section>
   </main>
 
-  <!-- 内嵌本地 JS 数据兜底（双击打开 index.html 也能正常加载） -->
-  <script src="./data/ipo_data.js"></script>
-  <script src="./data/committee_data.js"></script>
-  <script src="./data/issuance_data.js"></script>
-  <script src="./data/neeq_data.js"></script>
-  <script src="./data/tutoring_data.js"></script>
-  <script src="./assets/app.js"></script>
+  <!-- 主应用逻辑（按路由按需懒加载 JSON 数据与 ECharts，加速首屏） -->
+  <script defer src="./assets/app.js"></script>
 </body>
 </html>

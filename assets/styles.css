@@ -589,7 +589,7 @@ body {
 .filter-label {
   font-size: 13.5px;
   color: var(--text-secondary);
-  width: 60px;
+  width: 72px;
   flex-shrink: 0;
   font-weight: 500;
   white-space: nowrap;
@@ -2180,4 +2180,43 @@ body {
   padding: 1px 5px;
   border-radius: 4px;
   flex-shrink: 0;
+}
+
+/* ==================== 三期：现场检查 & 监管措施样式 ==================== */
+.board-主板 { background: #e8f0fe; color: #1967d2; }
+
+.regulator-pill {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.regulator-证监会 { background: #fce8e6; color: #c5221f; }
+.regulator-上交所 { background: #e8f0fe; color: #1967d2; }
+.regulator-深交所 { background: #e6f4ea; color: #137333; }
+.regulator-北交所 { background: #fef7e0; color: #b06000; }
+
+.reg-cat-纪律处分 { background: #fce8e6; color: #c5221f; }
+.reg-cat-监管措施,
+.reg-cat-监管警示,
+.reg-cat-监管函   { background: #fef7e0; color: #b06000; }
+.reg-cat-行政监管 { background: #f3e8fd; color: #7627bb; }
+
+.reg-doc-link {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.45;
+  transition: color 0.15s;
+}
+
+.reg-doc-link:hover {
+  color: var(--g-blue);
+  text-decoration: underline;
 }

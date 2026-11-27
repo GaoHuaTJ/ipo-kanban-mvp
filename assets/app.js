@@ -76,14 +76,41 @@
     },
   };
 
+  const TAB_ROUTES = {
+    "全景图": "/ipo-review/kanban",
+    "审核动态": "/ipo-review/a-stock",
+    "上市委审议": "/ipo-review/stock-review",
+    "发行动态": "/ipo-review/new-stock",
+    "现场检查": "/ipo-review/onsite-inspection",
+    "监管措施": "/ipo-review/regulatory-measures",
+    "辅导备案": "/ipo-review/guidance",
+    "新三板挂牌": "/ipo-review/new-third-board",
+    "港股IPO": "/ipo-review/oversea-stock",
+  };
+  const ROUTE_TO_TAB = Object.fromEntries(Object.entries(TAB_ROUTES).map(([k, v]) => [v, k]));
+
+  const DATASET_META = {
+    ipo: ["data/ipo_data.json", "data/ipo_data.js", "__IPO_DATA__"],
+    committee: ["data/committee_data.json", "data/committee_data.js", "__COMMITTEE_DATA__"],
+    issuance: ["data/issuance_data.json", "data/issuance_data.js", "__ISSUANCE_DATA__"],
+    inspection: ["data/inspection_data.json", "data/inspection_data.js", "__INSPECTION_DATA__"],
+    regulatory: ["data/regulatory_data.json", "data/regulatory_data.js", "__REGULATORY_DATA__"],
+    tutoring: ["data/tutoring_data.json", "data/tutoring_data.js", "__TUTORING_DATA__"],
+    neeq: ["data/neeq_data.json", "data/neeq_data.js", "__NEEQ_DATA__"],
+  };
+
   const state = {
     meta: null,
     records: [],        // 全量审核记录（含注册同意/终止）
     activeRecords: [],  // 当前在审记录（全景图统计口径）
     committeeRecords: [], // 二期：上市委审议记录
     issuanceRecords: [],  // 二期：新股发行动态记录
+    inspectionRecords: [], // 三期：现场检查抽查名单
+    regulatoryRecords: [], // 三期：IPO监管措施清单
     tutoringRecords: [],  // 二期第2周：辅导备案公告
     neeqRecords: [],      // 二期第2周：新三板挂牌企业
+    loaded: {},
+    loading: {},
     currentDetailRec: null,
     activeTab: "全景图",
     previousTab: "审核动态",
@@ -116,6 +143,20 @@
       board: "全部",
       status: "全部",
       year: "全部",
+      keyword: "",
+      page: 1,
+      pageSize: 30,
+    },
+    inspFilters: {
+      board: "全部",
+      stage: "全部",
+      keyword: "",
+      page: 1,
+      pageSize: 30,
+    },
+    regFilters: {
+      regulator: "全部",
+      stage: "全部",
       keyword: "",
       page: 1,
       pageSize: 30,
@@ -294,28 +335,108 @@
     });
   }
 
-  async function loadJsonWithFallback(url, fallbackData) {
-    try {
-      const resp = await fetch(url, { cache: "no-cache" });
-      if (resp.ok) return await resp.json();
-    } catch (_) {}
-    if (fallbackData) return fallbackData;
+  const _scriptPromises = {};
+
+  function getBasePrefix() {
+    const p = window.location.pathname || "/";
+    return p === "/ipoflow" || p.startsWith("/ipoflow/") ? "/ipoflow" : "";
+  }
+
+  function assetUrl(relPath) {
+    const clean = String(relPath || "").replace(/^\.\//, "").replace(/^\/+/, "");
+    if (window.location.protocol === "file:") return `./${clean}`;
+    return `${getBasePrefix()}/${clean}`;
+  }
+
+  function loadScriptOnce(relPath) {
+    const url = assetUrl(relPath);
+    if (_scriptPromises[url]) return _scriptPromises[url];
+    _scriptPromises[url] = new Promise((resolve) => {
+      const s = document.createElement("script");
+      s.src = url;
+      s.async = true;
+      s.onload = () => resolve(true);
+      s.onerror = () => resolve(false);
+      document.head.appendChild(s);
+    });
+    return _scriptPromises[url];
+  }
+
+  async function ensureEcharts() {
+    if (window.echarts) return true;
+    await loadScriptOnce("assets/vendor/echarts.min.js");
+    return Boolean(window.echarts);
+  }
+
+  async function loadJsonWithFallback(jsonRelPath, jsRelPath, globalVar) {
+    if (window.location.protocol !== "file:") {
+      try {
+        const resp = await fetch(assetUrl(jsonRelPath));
+        if (resp.ok) return await resp.json();
+      } catch (_) {}
+    }
+    if (globalVar && window[globalVar]) return window[globalVar];
+    if (jsRelPath) {
+      await loadScriptOnce(jsRelPath);
+      if (globalVar && window[globalVar]) return window[globalVar];
+    }
     return { meta: {}, records: [] };
   }
 
-  async function loadData() {
-    const res = await loadJsonWithFallback("./data/ipo_data.json", window.__IPO_DATA__);
-    if (!res || !res.records || !res.records.length) {
-      throw new Error("无法加载 data/ipo_data.json 或 data/ipo_data.js");
-    }
-    return res;
+  async function ensureDataset(key) {
+    if (state.loaded[key]) return true;
+    if (state.loading[key]) return state.loading[key];
+    const spec = DATASET_META[key];
+    if (!spec) return false;
+
+    const promise = (async () => {
+      const [jsonPath, jsPath, globalVar] = spec;
+      const payload = await loadJsonWithFallback(jsonPath, jsPath, globalVar);
+      const recs = (payload && payload.records) || [];
+
+      if (key === "ipo") {
+        state.meta = (payload && payload.meta) || {};
+        state.records = recs;
+        state.activeRecords = recs.filter((r) => r.is_active !== false);
+        updateOverviewBoardCounts();
+        updateHeaderMeta();
+        updateFilterChipCounts();
+        populateProvinceSelect();
+      } else if (key === "committee") {
+        state.committeeRecords = recs;
+        updateCommitteeChipCounts();
+      } else if (key === "issuance") {
+        state.issuanceRecords = recs;
+        updateIssuanceChipCounts();
+      } else if (key === "inspection") {
+        state.inspectionRecords = recs;
+        updateInspectionChipCounts();
+      } else if (key === "regulatory") {
+        state.regulatoryRecords = recs;
+        updateRegulatoryChipCounts();
+      } else if (key === "tutoring") {
+        state.tutoringRecords = recs;
+        updateTutoringChipCounts();
+      } else if (key === "neeq") {
+        state.neeqRecords = recs;
+        updateNeeqChipCounts();
+      }
+
+      state.loaded[key] = true;
+      return true;
+    })().finally(() => {
+      delete state.loading[key];
+    });
+
+    state.loading[key] = promise;
+    return promise;
   }
 
   async function ensureChinaGeoJson() {
     if (state.chinaMapLoaded) return true;
     if (state.chinaMapFailed) return false;
     const urls = [
-      "./data/china.json",
+      assetUrl("data/china.json"),
       "https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json",
     ];
     for (const url of urls) {
@@ -977,7 +1098,7 @@
       .join("")}</div>`;
   }
 
-  function switchDetailTab(dtab) {
+  async function switchDetailTab(dtab) {
     document.querySelectorAll(".detail-tab").forEach((b) => b.classList.toggle("active", b.dataset.dtab === dtab));
     $("dtab-info").classList.toggle("hidden", dtab !== "info");
     $("dtab-docs").classList.toggle("hidden", dtab !== "docs");
@@ -985,6 +1106,10 @@
     $("dtab-future").classList.toggle("hidden", dtab !== "fundamental");
 
     if (dtab === "issue") {
+      if (!state.loaded.issuance) {
+        $("detail-issue-content").innerHTML = `<div style="color:#8f959e;font-size:13px;padding:12px 0;">正在加载发行动态数据...</div>`;
+        await ensureDataset("issuance");
+      }
       renderDetailIssueTab(state.currentDetailRec);
     } else if (dtab === "fundamental") {
       $("dtab-future-title").textContent = "企业基本面（三期规划）";
@@ -992,13 +1117,20 @@
     }
   }
 
-  async function openProjectDetail(rec, defaultDetailTab = "info") {
-    state.previousTab = state.activeTab;
+  async function openProjectDetail(rec, defaultDetailTab = "info", options = {}) {
+    if (state.activeTab) state.previousTab = state.activeTab;
     state.currentDetailRec = rec;
+    if (!options.skipHistory) {
+      const qs = new URLSearchParams({ company: rec.company || "" });
+      if (rec.exchange) qs.set("exchange", rec.exchange);
+      updateBrowserUrl(`/ipo-review/a-stock/detail?${qs.toString()}`, `${rec.company} · 项目详情`, Boolean(options.replaceHistory));
+    }
     $("view-overview").classList.add("hidden");
     $("view-dynamics").classList.add("hidden");
     $("view-committee").classList.add("hidden");
     $("view-issuance").classList.add("hidden");
+    if ($("view-inspection")) $("view-inspection").classList.add("hidden");
+    if ($("view-regulatory")) $("view-regulatory").classList.add("hidden");
     $("view-tutoring").classList.add("hidden");
     $("view-tutoring-detail").classList.add("hidden");
     $("view-neeq").classList.add("hidden");
@@ -1270,9 +1402,10 @@
         .join("");
 
       tbody.querySelectorAll("tr.clickable-row").forEach((tr) => {
-        tr.addEventListener("click", () => {
+        tr.addEventListener("click", async () => {
           const item = pageRows[Number(tr.dataset.cmIdx)];
           if (!item) return;
+          if (!state.loaded.ipo) await ensureDataset("ipo");
           const norm = String(item.company || "").replace(/[（()）\s]/g, "");
           const matched = state.records.find((x) => String(x.company || "").replace(/[（()）\s]/g, "") === norm);
           openProjectDetail(
@@ -1445,9 +1578,10 @@
         .join("");
 
       tbody.querySelectorAll("tr.clickable-row").forEach((tr) => {
-        tr.addEventListener("click", () => {
+        tr.addEventListener("click", async () => {
           const item = pageRows[Number(tr.dataset.issIdx)];
           if (!item) return;
+          if (!state.loaded.ipo) await ensureDataset("ipo");
           const norm = String(item.company || "").replace(/[（()）\s]/g, "");
           const matched = state.records.find(
             (x) =>
@@ -1886,7 +2020,7 @@
     const shard = rec.r_shard;
     let shardData = state.tutReportShardCache[shard];
     if (!shardData) {
-      const resp = await fetch(`./data/tutoring_reports/${shard}.json`, { cache: "no-cache" });
+      const resp = await fetch(assetUrl(`data/tutoring_reports/${shard}.json`));
       if (!resp.ok) return;
       shardData = await resp.json();
       state.tutReportShardCache[shard] = shardData || {};
@@ -1903,13 +2037,19 @@
     rec._reportsLoaded = true;
   }
 
-  async function openTutoringDetail(rec) {
+  async function openTutoringDetail(rec, options = {}) {
     state.previousTab = "辅导备案";
     state.currentTutRec = rec;
+    if (!options.skipHistory) {
+      const qs = new URLSearchParams({ company: rec.company || "" });
+      updateBrowserUrl(`/ipo-review/guidance/detail?${qs.toString()}`, `${rec.company} · 辅导详情`, Boolean(options.replaceHistory));
+    }
     $("view-overview").classList.add("hidden");
     $("view-dynamics").classList.add("hidden");
     $("view-committee").classList.add("hidden");
     $("view-issuance").classList.add("hidden");
+    if ($("view-inspection")) $("view-inspection").classList.add("hidden");
+    if ($("view-regulatory")) $("view-regulatory").classList.add("hidden");
     $("view-tutoring").classList.add("hidden");
     $("view-neeq").classList.add("hidden");
     $("view-placeholder").classList.add("hidden");
@@ -2148,9 +2288,367 @@
     exportGenericExcel(headers, rows, "新三板挂牌", `新三板挂牌清单_${(state.meta && state.meta.update_date) || "export"}`);
   }
 
-  function switchSubTab(tabName) {
+  // ==================== 三期：现场检查 & 监管措施 ====================
+  async function openCompanyDetailByName(companyName, fallback = {}) {
+    if (!companyName || companyName === "—") return;
+    if (!state.loaded.ipo) await ensureDataset("ipo");
+    const norm = String(companyName || "").replace(/[（()）\s]/g, "");
+    const matched = state.records.find(
+      (x) => String(x.company || "").replace(/[（()）\s]/g, "") === norm
+    );
+    openProjectDetail(
+      matched || {
+        company: companyName,
+        exchange: fallback.exchange || "上交所",
+        board: fallback.board || "科创板",
+        stage: fallback.stage || "问询",
+        raw_status: fallback.raw_status || fallback.stage || "—",
+        security_code: "",
+        province: "—",
+        industry: "—",
+        sponsors: fallback.sponsor && fallback.sponsor !== "—" ? [fallback.sponsor] : [],
+        law_firms: [],
+        accounting_firms: [],
+        accept_date: fallback.accept_date || "",
+        update_date: fallback.update_date || "",
+        source_url: fallback.source_url || "",
+      }
+    );
+  }
+
+  function normalizeInspBoard(board) {
+    const b = String(board || "");
+    if (b === "沪主板" || b === "深主板" || b === "主板") return "主板";
+    return b || "主板";
+  }
+
+  function updateInspectionChipCounts() {
+    const bdCounts = {};
+    const stCounts = {};
+    for (const r of state.inspectionRecords) {
+      const nb = normalizeInspBoard(r.board);
+      bdCounts[nb] = (bdCounts[nb] || 0) + 1;
+      const st = r.stage || "终止";
+      stCounts[st] = (stCounts[st] || 0) + 1;
+    }
+    document.querySelectorAll("#insp-board-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${bdCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#insp-stage-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${stCounts[v] || 0})</span>`;
+    });
+  }
+
+  function getFilteredInspection() {
+    const { board, stage, keyword } = state.inspFilters;
+    const kw = keyword.trim().toLowerCase();
+    return state.inspectionRecords.filter((r) => {
+      if (board !== "全部" && normalizeInspBoard(r.board) !== board) return false;
+      if (stage !== "全部" && (r.stage || "") !== stage) return false;
+      if (kw) {
+        const hay = [r.company, r.sponsor, r.batch, r.exchange, r.board, r.raw_status].join(" ").toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderInspectionKPI(filtered) {
+    const total = filtered.length;
+    const terminated = filtered.filter((r) => r.stage === "终止").length;
+    const active = filtered.filter((r) => ["受理", "问询", "上市委", "提交注册", "中止"].includes(r.stage)).length;
+    const registered = filtered.filter((r) => r.stage === "注册同意").length;
+    const withdrawRate = total ? ((terminated / total) * 100).toFixed(1) : "0.0";
+
+    $("insp-kpi-grid").innerHTML = `
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">累计抽查企业</div>
+        <div class="kpi-value">${total.toLocaleString()}</div>
+        <div class="kpi-sub">中证协 / 证监会首发信息披露抽查</div>
+      </div>
+      <div class="kpi-card kpi-red">
+        <div class="kpi-label">抽查后终止 / 撤回</div>
+        <div class="kpi-value">${terminated.toLocaleString()}</div>
+        <div class="kpi-sub">抽查后终止/撤回率 ${withdrawRate}%</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">当前在审（含中止）</div>
+        <div class="kpi-value">${active.toLocaleString()}</div>
+        <div class="kpi-sub">仍在交易所审核/注册推进中</div>
+      </div>
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">已注册同意</div>
+        <div class="kpi-value">${registered.toLocaleString()}</div>
+        <div class="kpi-sub">通过检查并获证监会注册批文</div>
+      </div>
+    `;
+  }
+
+  function renderInspectionTable() {
+    const filtered = getFilteredInspection();
+    renderInspectionKPI(filtered);
+
+    const total = filtered.length;
+    const { pageSize } = state.inspFilters;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (state.inspFilters.page > totalPages) state.inspFilters.page = totalPages;
+
+    const start = (state.inspFilters.page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    $("insp-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 条相关结果`;
+
+    const tbody = $("insp-tbody");
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的现场检查记录</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows
+        .map((r, idx) => {
+          const st = r.stage || "终止";
+          const stLabel = r.raw_status || st;
+          const dispBoard = r.board || "—";
+          return `
+            <tr class="clickable-row" data-insp-idx="${idx}">
+              <td><span class="row-index-badge">${start + idx + 1}</span></td>
+              <td class="date-cell">${escapeHtml(r.lottery_date || "—")}</td>
+              <td><span class="company-link">${escapeHtml(r.company)}</span></td>
+              <td style="color:#3c4043;white-space:nowrap;">${escapeHtml(r.batch || "—")}</td>
+              <td class="num-cell">${escapeHtml(r.ratio || "—")}</td>
+              <td><span class="stage-tag stage-${escapeHtml(st)}"><span class="status-dot"></span>${escapeHtml(stLabel)}</span></td>
+              <td style="white-space:nowrap;color:#5f6368;font-weight:500;">${escapeHtml(r.exchange || "—")}</td>
+              <td><span class="board-tag board-${escapeHtml(dispBoard)}">${escapeHtml(dispBoard)}</span></td>
+              <td style="color:#3c4043;white-space:nowrap;">${escapeHtml(normalizeBrokerName(r.sponsor) || "—")}</td>
+              <td class="date-cell muted">${escapeHtml(r.accept_date || "—")}</td>
+            </tr>`;
+        })
+        .join("");
+
+      tbody.querySelectorAll("tr.clickable-row").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const item = pageRows[Number(tr.dataset.inspIdx)];
+          if (!item) return;
+          openCompanyDetailByName(item.company, {
+            exchange: item.exchange,
+            board: item.board,
+            stage: item.stage,
+            raw_status: item.raw_status,
+            sponsor: item.sponsor,
+            accept_date: item.accept_date,
+            update_date: item.lottery_date,
+            source_url: item.source_url,
+          });
+        });
+      });
+    }
+
+    $("insp-page-info").textContent = `第 ${state.inspFilters.page} / ${totalPages} 页`;
+    $("insp-prev-page").disabled = state.inspFilters.page <= 1;
+    $("insp-next-page").disabled = state.inspFilters.page >= totalPages;
+    renderPageNumbers("insp-prev-page", state.inspFilters.page, totalPages, (p) => {
+      state.inspFilters.page = p;
+      renderInspectionTable();
+    });
+  }
+
+  function updateRegulatoryChipCounts() {
+    const orgCounts = {};
+    const stCounts = {};
+    for (const r of state.regulatoryRecords) {
+      const reg = r.regulator || "";
+      if (reg) orgCounts[reg] = (orgCounts[reg] || 0) + 1;
+      const st = r.stage || "";
+      if (st) stCounts[st] = (stCounts[st] || 0) + 1;
+    }
+    document.querySelectorAll("#reg-org-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${orgCounts[v] || 0})</span>`;
+    });
+    document.querySelectorAll("#reg-stage-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${stCounts[v] || 0})</span>`;
+    });
+  }
+
+  function getFilteredRegulatory() {
+    const { regulator, stage, keyword } = state.regFilters;
+    const kw = keyword.trim().toLowerCase();
+    return state.regulatoryRecords.filter((r) => {
+      if (regulator !== "全部" && (r.regulator || "") !== regulator) return false;
+      if (stage !== "全部" && (r.stage || "") !== stage) return false;
+      if (kw) {
+        const hay = [r.title, r.company, r.regulator, r.category, r.raw_status].join(" ").toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderRegulatoryKPI(filtered) {
+    const total = filtered.length;
+    const discipline = filtered.filter((r) => (r.category || "").includes("纪律")).length;
+    const warning = filtered.filter((r) => !(r.category || "").includes("纪律")).length;
+    const terminatedProj = filtered.filter((r) => r.stage === "终止").length;
+
+    $("reg-kpi-grid").innerHTML = `
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">累计 IPO 监管措施</div>
+        <div class="kpi-value">${total.toLocaleString()}</div>
+        <div class="kpi-sub">证监会及沪深北交易所公开汇总</div>
+      </div>
+      <div class="kpi-card kpi-red">
+        <div class="kpi-label">纪律处分</div>
+        <div class="kpi-value">${discipline.toLocaleString()}</div>
+        <div class="kpi-sub">含通报批评、公开谴责等</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">监管警示 / 监管函</div>
+        <div class="kpi-value">${warning.toLocaleString()}</div>
+        <div class="kpi-sub">含书面警示、监管谈话、出具警示函</div>
+      </div>
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">涉及已终止 IPO 项目</div>
+        <div class="kpi-value">${terminatedProj.toLocaleString()}</div>
+        <div class="kpi-sub">占比 ${total ? ((terminatedProj / total) * 100).toFixed(1) : "0.0"}%</div>
+      </div>
+    `;
+  }
+
+  function renderRegulatoryTable() {
+    const filtered = getFilteredRegulatory();
+    renderRegulatoryKPI(filtered);
+
+    const total = filtered.length;
+    const { pageSize } = state.regFilters;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (state.regFilters.page > totalPages) state.regFilters.page = totalPages;
+
+    const start = (state.regFilters.page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    $("reg-count").innerHTML = `为您找到 <b style="color:#1a73e8;font-size:15px;">${total.toLocaleString()}</b> 条相关结果`;
+
+    const tbody = $("reg-tbody");
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的监管措施记录</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows
+        .map((r, idx) => {
+          const isPdf = String(r.pdf_url || "").toLowerCase().includes(".pdf");
+          const docHtml = r.pdf_url
+            ? `<a class="reg-doc-link" href="${escapeHtml(r.pdf_url)}" target="_blank" rel="noopener noreferrer" title="查看官方原文">${escapeHtml(r.title)}${isPdf ? '<span class="pdf-pill">PDF</span>' : ""}</a>`
+            : `<span>${escapeHtml(r.title)}</span>`;
+          const compHtml = r.company && r.company !== "—"
+            ? `<span class="company-link reg-proj-link" data-reg-idx="${idx}" style="cursor:pointer;">${escapeHtml(r.company)}</span>`
+            : `<span style="color:#80868b;">—</span>`;
+          const st = r.stage || "";
+          const stHtml = st
+            ? `<span class="stage-tag stage-${escapeHtml(st)}"><span class="status-dot"></span>${escapeHtml(r.raw_status || st)}</span>`
+            : `<span style="color:#80868b;">${escapeHtml(r.raw_status || "—")}</span>`;
+          const regOrg = r.regulator || "证监会";
+          const cat = r.category || "监管措施";
+          return `
+            <tr>
+              <td><span class="row-index-badge">${start + idx + 1}</span></td>
+              <td>${docHtml}</td>
+              <td>${compHtml}</td>
+              <td>${stHtml}</td>
+              <td><span class="regulator-pill regulator-${escapeHtml(regOrg)}">${escapeHtml(regOrg)}</span></td>
+              <td><span class="stage-tag reg-cat-${escapeHtml(cat)}">${escapeHtml(cat)}</span></td>
+              <td class="date-cell">${escapeHtml(r.announce_date || "—")}</td>
+            </tr>`;
+        })
+        .join("");
+
+      tbody.querySelectorAll(".reg-proj-link").forEach((el) => {
+        el.addEventListener("click", () => {
+          const item = pageRows[Number(el.dataset.regIdx)];
+          if (!item || !item.company) return;
+          openCompanyDetailByName(item.company, {
+            exchange: item.regulator === "上交所" || item.regulator === "深交所" || item.regulator === "北交所" ? item.regulator : "上交所",
+            stage: item.stage,
+            raw_status: item.raw_status,
+            update_date: item.announce_date,
+          });
+        });
+      });
+    }
+
+    $("reg-page-info").textContent = `第 ${state.regFilters.page} / ${totalPages} 页`;
+    $("reg-prev-page").disabled = state.regFilters.page <= 1;
+    $("reg-next-page").disabled = state.regFilters.page >= totalPages;
+    renderPageNumbers("reg-prev-page", state.regFilters.page, totalPages, (p) => {
+      state.regFilters.page = p;
+      renderRegulatoryTable();
+    });
+  }
+
+  // ==================== 路由与按需懒加载控制 ====================
+  function updateBrowserUrl(routePath, titleText, replace = false) {
+    const cleanTitle = titleText ? `${titleText} · IPO 智览` : "IPO 智览 · 首发上市全景看板";
+    document.title = cleanTitle;
+    try {
+      if (window.location.protocol === "file:") {
+        const nextHash = `#${routePath}`;
+        if (window.location.hash !== nextHash) {
+          if (replace) window.history.replaceState(null, cleanTitle, nextHash);
+          else window.location.hash = nextHash;
+        }
+        return;
+      }
+      const targetUrl = `${getBasePrefix()}${routePath}`;
+      const currentFull = `${window.location.pathname}${window.location.search}`;
+      if (currentFull !== targetUrl) {
+        if (replace) window.history.replaceState({ routePath }, cleanTitle, targetUrl);
+        else window.history.pushState({ routePath }, cleanTitle, targetUrl);
+      }
+    } catch (_) {}
+  }
+
+  function parseRouteFromLocation() {
+    let raw = "";
+    if (window.location.protocol === "file:" && window.location.hash.startsWith("#/")) {
+      raw = window.location.hash.slice(1);
+    } else {
+      const sp = new URLSearchParams(window.location.search);
+      const pParam = sp.get("p");
+      if (pParam && pParam.startsWith("/")) {
+        raw = pParam;
+      } else {
+        let p = window.location.pathname || "/";
+        const prefix = getBasePrefix();
+        if (prefix && p.startsWith(prefix)) p = p.slice(prefix.length) || "/";
+        raw = p + (window.location.search || "");
+      }
+    }
+
+    const qIdx = raw.indexOf("?");
+    const pathPart = (qIdx >= 0 ? raw.slice(0, qIdx) : raw).replace(/\/+$/, "") || "/";
+    const queryPart = qIdx >= 0 ? raw.slice(qIdx + 1) : "";
+    const qs = new URLSearchParams(queryPart);
+
+    if (pathPart === "/ipo-review/a-stock/detail") {
+      return { kind: "detail", company: qs.get("company") || "", exchange: qs.get("exchange") || "" };
+    }
+    if (pathPart === "/ipo-review/guidance/detail") {
+      return { kind: "tutoring-detail", company: qs.get("company") || "" };
+    }
+    if (ROUTE_TO_TAB[pathPart]) {
+      return { kind: "tab", tab: ROUTE_TO_TAB[pathPart] };
+    }
+    return { kind: "tab", tab: "全景图" };
+  }
+
+  async function switchSubTab(tabName, options = {}) {
     state.activeTab = tabName;
     if ($("active-subtab-pill")) $("active-subtab-pill").textContent = tabName;
+
+    if (!options.skipHistory) {
+      const routePath = TAB_ROUTES[tabName] || "/ipo-review/kanban";
+      updateBrowserUrl(routePath, tabName, Boolean(options.replaceHistory));
+    }
+
     $("view-detail").classList.add("hidden");
     $("view-tutoring-detail").classList.add("hidden");
     document.querySelectorAll(".sub-tab").forEach((btn) => {
@@ -2161,10 +2659,12 @@
     $("view-dynamics").classList.toggle("hidden", tabName !== "审核动态");
     $("view-committee").classList.toggle("hidden", tabName !== "上市委审议");
     $("view-issuance").classList.toggle("hidden", tabName !== "发行动态");
+    if ($("view-inspection")) $("view-inspection").classList.toggle("hidden", tabName !== "现场检查");
+    if ($("view-regulatory")) $("view-regulatory").classList.toggle("hidden", tabName !== "监管措施");
     $("view-tutoring").classList.toggle("hidden", tabName !== "辅导备案");
     $("view-neeq").classList.toggle("hidden", tabName !== "新三板挂牌");
 
-    const builtTabs = new Set(["全景图", "审核动态", "上市委审议", "发行动态", "辅导备案", "新三板挂牌"]);
+    const builtTabs = new Set(["全景图", "审核动态", "上市委审议", "发行动态", "现场检查", "监管措施", "辅导备案", "新三板挂牌"]);
     const placeholder = $("view-placeholder");
     if (!builtTabs.has(tabName)) {
       const info = FUTURE_TAB_INFO[tabName] || { title: tabName, desc: "后续规划接入", source: "" };
@@ -2177,11 +2677,57 @@
     }
 
     if (tabName === "全景图") {
+      await Promise.all([ensureDataset("ipo"), ensureEcharts()]);
+      renderMatrix();
+      renderOrgCharts();
+      await renderMapOrBar();
       setTimeout(() => {
         if (mapChart) mapChart.resize();
         if (sponsorChart) sponsorChart.resize();
         if (rightOrgChart) rightOrgChart.resize();
       }, 50);
+    } else if (tabName === "审核动态") {
+      if (!state.loaded.ipo) {
+        $("dynamics-tbody").innerHTML = `<tr><td colspan="11" style="text-align:center;padding:36px;color:#80868b;">正在按需加载 A股IPO 审核动态数据...</td></tr>`;
+        await ensureDataset("ipo");
+      }
+      renderDynamicsTable();
+    } else if (tabName === "上市委审议") {
+      if (!state.loaded.committee) {
+        $("cm-tbody").innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:#80868b;">正在按需加载上市委审议数据...</td></tr>`;
+        await ensureDataset("committee");
+      }
+      renderCommitteeTable();
+    } else if (tabName === "发行动态") {
+      if (!state.loaded.issuance) {
+        $("iss-tbody").innerHTML = `<tr><td colspan="12" style="text-align:center;padding:36px;color:#80868b;">正在按需加载新股发行动态数据...</td></tr>`;
+        await ensureDataset("issuance");
+      }
+      renderIssuanceTable();
+    } else if (tabName === "现场检查") {
+      if (!state.loaded.inspection) {
+        $("insp-tbody").innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:#80868b;">正在按需加载首发企业现场检查数据...</td></tr>`;
+        await ensureDataset("inspection");
+      }
+      renderInspectionTable();
+    } else if (tabName === "监管措施") {
+      if (!state.loaded.regulatory) {
+        $("reg-tbody").innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:#80868b;">正在按需加载 IPO 监管措施数据...</td></tr>`;
+        await ensureDataset("regulatory");
+      }
+      renderRegulatoryTable();
+    } else if (tabName === "辅导备案") {
+      if (!state.loaded.tutoring) {
+        $("tut-tbody").innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:#80868b;">正在按需加载全国证监会辅导备案数据...</td></tr>`;
+        await ensureDataset("tutoring");
+      }
+      renderTutoringTable();
+    } else if (tabName === "新三板挂牌") {
+      if (!state.loaded.neeq) {
+        $("neeq-tbody").innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:#80868b;">正在按需加载新三板挂牌数据...</td></tr>`;
+        await ensureDataset("neeq");
+      }
+      renderNeeqTable();
     }
   }
 
@@ -2532,6 +3078,97 @@
     $("neeq-prev-page").addEventListener("click", () => { if (state.neeqFilters.page > 1) { state.neeqFilters.page -= 1; renderNeeqTable(); } });
     $("neeq-next-page").addEventListener("click", () => { state.neeqFilters.page += 1; renderNeeqTable(); });
 
+    // ==================== 三期：现场检查 & 监管措施事件绑定 ====================
+    const syncInspUI = () => {
+      document.querySelectorAll("#insp-board-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.inspFilters.board));
+      document.querySelectorAll("#insp-stage-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.inspFilters.stage));
+      if ($("insp-keyword")) $("insp-keyword").value = state.inspFilters.keyword;
+      if ($("insp-clear-search")) $("insp-clear-search").classList.toggle("hidden", !state.inspFilters.keyword);
+    };
+    document.querySelectorAll("#insp-board-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.inspFilters.board = btn.dataset.val; state.inspFilters.page = 1; syncInspUI(); renderInspectionTable(); });
+    });
+    document.querySelectorAll("#insp-stage-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.inspFilters.stage = btn.dataset.val; state.inspFilters.page = 1; syncInspUI(); renderInspectionTable(); });
+    });
+    if ($("insp-keyword")) {
+      $("insp-keyword").addEventListener("input", (e) => {
+        state.inspFilters.keyword = e.target.value; state.inspFilters.page = 1;
+        $("insp-clear-search").classList.toggle("hidden", !state.inspFilters.keyword);
+        renderInspectionTable();
+      });
+    }
+    if ($("insp-clear-search")) {
+      $("insp-clear-search").addEventListener("click", () => {
+        state.inspFilters.keyword = ""; state.inspFilters.page = 1; syncInspUI(); renderInspectionTable(); $("insp-keyword").focus();
+      });
+    }
+    if ($("insp-reset")) {
+      $("insp-reset").addEventListener("click", () => {
+        const sz = state.inspFilters.pageSize;
+        state.inspFilters = { board: "全部", stage: "全部", keyword: "", page: 1, pageSize: sz };
+        syncInspUI(); renderInspectionTable();
+      });
+    }
+    if ($("insp-page-size")) $("insp-page-size").addEventListener("change", (e) => { state.inspFilters.pageSize = Number(e.target.value) || 30; state.inspFilters.page = 1; renderInspectionTable(); });
+    if ($("insp-prev-page")) $("insp-prev-page").addEventListener("click", () => { if (state.inspFilters.page > 1) { state.inspFilters.page -= 1; renderInspectionTable(); } });
+    if ($("insp-next-page")) $("insp-next-page").addEventListener("click", () => { state.inspFilters.page += 1; renderInspectionTable(); });
+
+    const syncRegUI = () => {
+      document.querySelectorAll("#reg-org-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.regFilters.regulator));
+      document.querySelectorAll("#reg-stage-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.regFilters.stage));
+      if ($("reg-keyword")) $("reg-keyword").value = state.regFilters.keyword;
+      if ($("reg-clear-search")) $("reg-clear-search").classList.toggle("hidden", !state.regFilters.keyword);
+    };
+    document.querySelectorAll("#reg-org-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.regFilters.regulator = btn.dataset.val; state.regFilters.page = 1; syncRegUI(); renderRegulatoryTable(); });
+    });
+    document.querySelectorAll("#reg-stage-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.regFilters.stage = btn.dataset.val; state.regFilters.page = 1; syncRegUI(); renderRegulatoryTable(); });
+    });
+    if ($("reg-keyword")) {
+      $("reg-keyword").addEventListener("input", (e) => {
+        state.regFilters.keyword = e.target.value; state.regFilters.page = 1;
+        $("reg-clear-search").classList.toggle("hidden", !state.regFilters.keyword);
+        renderRegulatoryTable();
+      });
+    }
+    if ($("reg-clear-search")) {
+      $("reg-clear-search").addEventListener("click", () => {
+        state.regFilters.keyword = ""; state.regFilters.page = 1; syncRegUI(); renderRegulatoryTable(); $("reg-keyword").focus();
+      });
+    }
+    if ($("reg-reset")) {
+      $("reg-reset").addEventListener("click", () => {
+        const sz = state.regFilters.pageSize;
+        state.regFilters = { regulator: "全部", stage: "全部", keyword: "", page: 1, pageSize: sz };
+        syncRegUI(); renderRegulatoryTable();
+      });
+    }
+    if ($("reg-page-size")) $("reg-page-size").addEventListener("change", (e) => { state.regFilters.pageSize = Number(e.target.value) || 30; state.regFilters.page = 1; renderRegulatoryTable(); });
+    if ($("reg-prev-page")) $("reg-prev-page").addEventListener("click", () => { if (state.regFilters.page > 1) { state.regFilters.page -= 1; renderRegulatoryTable(); } });
+    if ($("reg-next-page")) $("reg-next-page").addEventListener("click", () => { state.regFilters.page += 1; renderRegulatoryTable(); });
+
+    const handleRouteRestore = async () => {
+      const route = parseRouteFromLocation();
+      if (route.kind === "detail" && route.company) {
+        await openCompanyDetailByName(route.company, { exchange: route.exchange });
+      } else if (route.kind === "tutoring-detail" && route.company) {
+        await ensureDataset("tutoring");
+        const norm = route.company.replace(/[（()）\s]/g, "");
+        const hit = state.tutoringRecords.find((x) => String(x.company || "").replace(/[（()）\s]/g, "") === norm);
+        if (hit) openTutoringDetail(hit, { skipHistory: true });
+        else await switchSubTab("辅导备案", { skipHistory: true });
+      } else {
+        await switchSubTab(route.tab || "全景图", { skipHistory: true });
+      }
+    };
+
+    window.addEventListener("popstate", handleRouteRestore);
+    window.addEventListener("hashchange", () => {
+      if (window.location.protocol === "file:") handleRouteRestore();
+    });
+
     window.addEventListener("resize", () => {
       if (mapChart) mapChart.resize();
       if (sponsorChart) sponsorChart.resize();
@@ -2594,43 +3231,52 @@
   async function init() {
     bindEvents();
     try {
-      const [payload, cmPayload, issPayload, tutPayload, neeqPayload] = await Promise.all([
-        loadData(),
-        loadJsonWithFallback("./data/committee_data.json", window.__COMMITTEE_DATA__),
-        loadJsonWithFallback("./data/issuance_data.json", window.__ISSUANCE_DATA__),
-        loadJsonWithFallback("./data/tutoring_data.json", window.__TUTORING_DATA__),
-        loadJsonWithFallback("./data/neeq_data.json", window.__NEEQ_DATA__),
-      ]);
+      if ($("source-dot")) $("source-dot").className = "source-dot";
+      if ($("source-text")) $("source-text").textContent = "实时数据 · IPOFlow";
 
-      state.meta = payload.meta || {};
-      state.records = payload.records || [];
-      state.activeRecords = state.records.filter((r) => r.is_active !== false);
-      state.committeeRecords = (cmPayload && cmPayload.records) || [];
-      state.issuanceRecords = (issPayload && issPayload.records) || [];
-      state.tutoringRecords = (tutPayload && tutPayload.records) || [];
-      state.neeqRecords = (neeqPayload && neeqPayload.records) || [];
+      const route = parseRouteFromLocation();
+      // 若通过 404.html ?p=... 跳回根路径，立即使用 replaceState 还原为干净路径
+      if (window.location.protocol !== "file:" && new URLSearchParams(window.location.search).has("p")) {
+        const prefix = getBasePrefix();
+        const rawP = new URLSearchParams(window.location.search).get("p") || "/ipo-review/kanban";
+        window.history.replaceState({ routePath: rawP }, document.title, `${prefix}${rawP}`);
+      }
 
-      updateOverviewBoardCounts();
-      updateHeaderMeta();
-      renderMatrix();
-      updateFilterChipCounts();
-      populateProvinceSelect();
-      renderDynamicsTable();
-      renderOrgCharts();
-
-      updateCommitteeChipCounts();
-      renderCommitteeTable();
-      updateIssuanceChipCounts();
-      renderIssuanceTable();
-      updateTutoringChipCounts();
-      renderTutoringTable();
-      updateNeeqChipCounts();
-      renderNeeqTable();
-
-      await renderMapOrBar();
+      if (route.kind === "detail" && route.company) {
+        state.activeTab = "审核动态";
+        if ($("active-subtab-pill")) $("active-subtab-pill").textContent = "审核动态";
+        await ensureDataset("ipo");
+        const norm = route.company.replace(/[（()）\s]/g, "");
+        const matched = state.records.find((x) => String(x.company || "").replace(/[（()）\s]/g, "") === norm);
+        await openProjectDetail(
+          matched || {
+            company: route.company,
+            exchange: route.exchange || "上交所",
+            board: "科创板",
+            stage: "问询",
+            raw_status: "—",
+            sponsors: [],
+            law_firms: [],
+            accounting_firms: [],
+          },
+          "info",
+          { skipHistory: true }
+        );
+      } else if (route.kind === "tutoring-detail" && route.company) {
+        state.activeTab = "辅导备案";
+        if ($("active-subtab-pill")) $("active-subtab-pill").textContent = "辅导备案";
+        await ensureDataset("tutoring");
+        const norm = route.company.replace(/[（()）\s]/g, "");
+        const hit = state.tutoringRecords.find((x) => String(x.company || "").replace(/[（()）\s]/g, "") === norm);
+        if (hit) await openTutoringDetail(hit, { skipHistory: true });
+        else await switchSubTab("辅导备案", { replaceHistory: true });
+      } else {
+        const targetTab = route.tab || "全景图";
+        await switchSubTab(targetTab, { replaceHistory: true });
+      }
     } catch (err) {
       console.error(err);
-      $("overview-date-text").textContent = "数据加载失败，请先运行数据脚本";
+      if ($("overview-date-text")) $("overview-date-text").textContent = "数据加载失败，请先运行数据脚本";
     }
   }
 
