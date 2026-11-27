@@ -91,6 +91,7 @@
 
   const DATASET_META = {
     ipo: ["data/ipo_data.json", "data/ipo_data.js", "__IPO_DATA__"],
+    ipoActive: ["data/ipo_active.json", "data/ipo_data.js", "__IPO_DATA__"],
     committee: ["data/committee_data.json", "data/committee_data.js", "__COMMITTEE_DATA__"],
     issuance: ["data/issuance_data.json", "data/issuance_data.js", "__ISSUANCE_DATA__"],
     inspection: ["data/inspection_data.json", "data/inspection_data.js", "__INSPECTION_DATA__"],
@@ -388,6 +389,7 @@
   }
 
   async function ensureDataset(key) {
+    if (key === "ipoActive" && state.loaded.ipo) return true;
     if (state.loaded[key]) return true;
     if (state.loading[key]) return state.loading[key];
     const spec = DATASET_META[key];
@@ -398,10 +400,16 @@
       const payload = await loadJsonWithFallback(jsonPath, jsPath, globalVar);
       const recs = (payload && payload.records) || [];
 
-      if (key === "ipo") {
+      if (key === "ipoActive") {
+        state.meta = (payload && payload.meta) || {};
+        state.activeRecords = recs.filter((r) => r.is_active !== false);
+        updateOverviewBoardCounts();
+        updateHeaderMeta();
+      } else if (key === "ipo") {
         state.meta = (payload && payload.meta) || {};
         state.records = recs;
         state.activeRecords = recs.filter((r) => r.is_active !== false);
+        state.loaded.ipoActive = true;
         updateOverviewBoardCounts();
         updateHeaderMeta();
         updateFilterChipCounts();
@@ -436,26 +444,41 @@
     return promise;
   }
 
+  let _chinaGeoPromise = null;
+  function prefetchChinaGeoJson() {
+    if (state.chinaMapLoaded) return Promise.resolve(true);
+    if (_chinaGeoPromise) return _chinaGeoPromise;
+    _chinaGeoPromise = (async () => {
+      const urls = [
+        assetUrl("data/china.json"),
+        "https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json",
+      ];
+      for (const url of urls) {
+        try {
+          const resp = await fetch(url);
+          if (!resp.ok) continue;
+          const geoJson = await resp.json();
+          if (geoJson && geoJson.features) {
+            state._chinaGeoJson = geoJson;
+            return true;
+          }
+        } catch (_) {}
+      }
+      state.chinaMapFailed = true;
+      return false;
+    })();
+    return _chinaGeoPromise;
+  }
+
   async function ensureChinaGeoJson() {
     if (state.chinaMapLoaded) return true;
     if (state.chinaMapFailed) return false;
-    const urls = [
-      assetUrl("data/china.json"),
-      "https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json",
-    ];
-    for (const url of urls) {
-      try {
-        const resp = await fetch(url);
-        if (!resp.ok) continue;
-        const geoJson = await resp.json();
-        if (window.echarts && geoJson && geoJson.features) {
-          window.echarts.registerMap("china", geoJson);
-          state.chinaMapLoaded = true;
-          return true;
-        }
-      } catch (_) {}
+    const ok = await prefetchChinaGeoJson();
+    if (ok && window.echarts && state._chinaGeoJson) {
+      window.echarts.registerMap("china", state._chinaGeoJson);
+      state.chinaMapLoaded = true;
+      return true;
     }
-    state.chinaMapFailed = true;
     return false;
   }
 
@@ -481,8 +504,8 @@
 
   function updateHeaderMeta() {
     const meta = state.meta || {};
-    const activeTotal = state.activeRecords.length;
-    const allTotal = state.records.length;
+    const activeTotal = state.activeRecords.length || meta.active_total || 0;
+    const allTotal = meta.total || state.records.length || activeTotal;
     const bd = state.overviewBoard;
     const scopedTotal = getOverviewActiveRecords().length;
 
@@ -2805,9 +2828,17 @@
     }
 
     if (tabName === "全景图") {
-      await Promise.all([ensureDataset("ipo"), ensureEcharts()]);
+      const pData = ensureDataset("ipoActive");
+      const pEcharts = ensureEcharts();
+      const pGeo = prefetchChinaGeoJson();
+
+      await pData;
       renderMatrix();
+
+      await pEcharts;
       renderOrgCharts();
+
+      await pGeo;
       await renderMapOrBar();
       setTimeout(() => {
         if (mapChart) mapChart.resize();

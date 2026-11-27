@@ -279,16 +279,25 @@ def save_output(records, source_key, source_label):
 
     json_path = os.path.join(data_dir, "ipo_data.json")
     js_path = os.path.join(data_dir, "ipo_data.js")
+    active_json_path = os.path.join(data_dir, "ipo_active.json")
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False)
+
+    active_records = [r for r in records if r.get("is_active") is not False]
+    active_payload = {
+        "meta": {**payload["meta"], "is_active_only": True},
+        "records": active_records,
+    }
+    with open(active_json_path, "w", encoding="utf-8") as f:
+        json.dump(active_payload, f, ensure_ascii=False, separators=(",", ":"))
 
     with open(js_path, "w", encoding="utf-8") as f:
         f.write("window.__IPO_DATA__ = ")
         json.dump(payload, f, ensure_ascii=False)
         f.write(";\n")
 
-    print(f"写入完成：全量 {len(records)} 条（其中在审 {active_count} 家） -> {json_path}")
+    print(f"写入完成：全量 {len(records)} 条（其中在审 {active_count} 家） -> {json_path} & {active_json_path}")
 
 
 def main():

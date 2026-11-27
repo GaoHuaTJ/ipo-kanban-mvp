@@ -19,7 +19,28 @@
   </script>
   <title>IPO 智览 · 首发上市全景看板</title>
   <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
-  <link rel="stylesheet" href="./assets/styles.css?v=20261127e" />
+  <link rel="stylesheet" href="./assets/styles.css?v=20261127f" />
+  <script>
+    (function () {
+      if (window.location.protocol === "file:") return;
+      var p = (window.location.pathname || "/").replace(/^\/ipoflow/, "").replace(/\/+$/, "") || "/";
+      if (p === "/" || p === "/index.html" || p === "/ipo-review/kanban") {
+        var links = [
+          { href: "./data/ipo_active.json", as: "fetch", cors: true },
+          { href: "./data/china.json", as: "fetch", cors: true },
+          { href: "./assets/vendor/echarts.min.js", as: "script", cors: false }
+        ];
+        for (var i = 0; i < links.length; i++) {
+          var l = document.createElement("link");
+          l.rel = "preload";
+          l.href = links[i].href;
+          l.as = links[i].as;
+          if (links[i].cors) l.crossOrigin = "anonymous";
+          document.head.appendChild(l);
+        }
+      }
+    })();
+  </script>
 </head>
 <body>
   <!-- 顶部导航栏 -->
@@ -1024,6 +1045,6 @@
   </main>
 
   <!-- 主应用逻辑（按路由按需懒加载 JSON 数据与 ECharts，加速首屏） -->
-  <script defer src="./assets/app.js?v=20261127e"></script>
+  <script defer src="./assets/app.js?v=20261127f"></script>
 </body>
 </html>

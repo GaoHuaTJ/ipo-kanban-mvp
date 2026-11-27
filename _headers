@@ -7,6 +7,8 @@
 /assets/styles.css
   Cache-Control: public, max-age=0, must-revalidate
 /assets/vendor/*
-  Cache-Control: public, max-age=604800
+  Cache-Control: public, max-age=604800, immutable
+/data/china.json
+  Cache-Control: public, max-age=604800, immutable
 /data/*
   Cache-Control: public, max-age=300, stale-while-revalidate=3600
