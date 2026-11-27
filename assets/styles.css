@@ -734,6 +734,11 @@ body {
   color: var(--g-blue);
 }
 
+.search-hero-bar .action-btn.primary {
+  min-width: 114px;
+  justify-content: center;
+}
+
 .action-btn.primary {
   background: var(--g-blue);
   border-color: var(--g-blue);

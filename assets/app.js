@@ -148,15 +148,19 @@
       pageSize: 30,
     },
     inspFilters: {
+      year: "全部",
       board: "全部",
       stage: "全部",
+      batch: "全部",
       keyword: "",
       page: 1,
       pageSize: 30,
     },
     regFilters: {
+      year: "全部",
       regulator: "全部",
       stage: "全部",
+      category: "全部",
       keyword: "",
       page: 1,
       pageSize: 30,
@@ -2322,15 +2326,30 @@
     return b || "主板";
   }
 
+  function extractBatchSuffix(batchText) {
+    const m = String(batchText || "").match(/第\s*\d+\s*批/);
+    return m ? m[0].replace(/\s+/g, "") : "";
+  }
+
   function updateInspectionChipCounts() {
+    const yrCounts = {};
     const bdCounts = {};
     const stCounts = {};
+    const btCounts = {};
     for (const r of state.inspectionRecords) {
+      const yr = (r.lottery_date || "").slice(0, 4);
+      if (yr) yrCounts[yr] = (yrCounts[yr] || 0) + 1;
       const nb = normalizeInspBoard(r.board);
       bdCounts[nb] = (bdCounts[nb] || 0) + 1;
       const st = r.stage || "终止";
       stCounts[st] = (stCounts[st] || 0) + 1;
+      const bt = extractBatchSuffix(r.batch);
+      if (bt) btCounts[bt] = (btCounts[bt] || 0) + 1;
     }
+    document.querySelectorAll("#insp-year-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+    });
     document.querySelectorAll("#insp-board-chips .chip-btn").forEach((b) => {
       const v = b.dataset.val;
       if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${bdCounts[v] || 0})</span>`;
@@ -2339,14 +2358,20 @@
       const v = b.dataset.val;
       if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${stCounts[v] || 0})</span>`;
     });
+    document.querySelectorAll("#insp-batch-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${btCounts[v] || 0})</span>`;
+    });
   }
 
   function getFilteredInspection() {
-    const { board, stage, keyword } = state.inspFilters;
+    const { year, board, stage, batch, keyword } = state.inspFilters;
     const kw = keyword.trim().toLowerCase();
     return state.inspectionRecords.filter((r) => {
+      if (year !== "全部" && !(r.lottery_date || "").startsWith(year)) return false;
       if (board !== "全部" && normalizeInspBoard(r.board) !== board) return false;
       if (stage !== "全部" && (r.stage || "") !== stage) return false;
+      if (batch !== "全部" && extractBatchSuffix(r.batch) !== batch) return false;
       if (kw) {
         const hay = [r.company, r.sponsor, r.batch, r.exchange, r.board, r.raw_status].join(" ").toLowerCase();
         if (!hay.includes(kw)) return false;
@@ -2453,14 +2478,28 @@
   }
 
   function updateRegulatoryChipCounts() {
+    const yrCounts = { older: 0 };
     const orgCounts = {};
     const stCounts = {};
+    const catCounts = {};
     for (const r of state.regulatoryRecords) {
+      const yr = (r.announce_date || "").slice(0, 4);
+      if (yr) {
+        if (yr >= "2023") yrCounts[yr] = (yrCounts[yr] || 0) + 1;
+        else yrCounts.older += 1;
+      }
       const reg = r.regulator || "";
       if (reg) orgCounts[reg] = (orgCounts[reg] || 0) + 1;
       const st = r.stage || "";
       if (st) stCounts[st] = (stCounts[st] || 0) + 1;
+      const cat = r.category || "";
+      if (cat) catCounts[cat] = (catCounts[cat] || 0) + 1;
     }
+    document.querySelectorAll("#reg-year-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v === "older") b.innerHTML = `2022及以前<span class="chip-count">(${yrCounts.older || 0})</span>`;
+      else if (v !== "全部") b.innerHTML = `${v}年<span class="chip-count">(${yrCounts[v] || 0})</span>`;
+    });
     document.querySelectorAll("#reg-org-chips .chip-btn").forEach((b) => {
       const v = b.dataset.val;
       if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${orgCounts[v] || 0})</span>`;
@@ -2469,14 +2508,27 @@
       const v = b.dataset.val;
       if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${stCounts[v] || 0})</span>`;
     });
+    document.querySelectorAll("#reg-cat-chips .chip-btn").forEach((b) => {
+      const v = b.dataset.val;
+      if (v !== "全部") b.innerHTML = `${v}<span class="chip-count">(${catCounts[v] || 0})</span>`;
+    });
   }
 
   function getFilteredRegulatory() {
-    const { regulator, stage, keyword } = state.regFilters;
+    const { year, regulator, stage, category, keyword } = state.regFilters;
     const kw = keyword.trim().toLowerCase();
     return state.regulatoryRecords.filter((r) => {
+      if (year !== "全部") {
+        const yr = (r.announce_date || "").slice(0, 4);
+        if (year === "older") {
+          if (!yr || yr >= "2023") return false;
+        } else if (yr !== year) {
+          return false;
+        }
+      }
       if (regulator !== "全部" && (r.regulator || "") !== regulator) return false;
       if (stage !== "全部" && (r.stage || "") !== stage) return false;
+      if (category !== "全部" && (r.category || "") !== category) return false;
       if (kw) {
         const hay = [r.title, r.company, r.regulator, r.category, r.raw_status].join(" ").toLowerCase();
         if (!hay.includes(kw)) return false;
@@ -3080,16 +3132,24 @@
 
     // ==================== 三期：现场检查 & 监管措施事件绑定 ====================
     const syncInspUI = () => {
+      document.querySelectorAll("#insp-year-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.inspFilters.year));
       document.querySelectorAll("#insp-board-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.inspFilters.board));
       document.querySelectorAll("#insp-stage-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.inspFilters.stage));
+      document.querySelectorAll("#insp-batch-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.inspFilters.batch));
       if ($("insp-keyword")) $("insp-keyword").value = state.inspFilters.keyword;
       if ($("insp-clear-search")) $("insp-clear-search").classList.toggle("hidden", !state.inspFilters.keyword);
     };
+    document.querySelectorAll("#insp-year-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.inspFilters.year = btn.dataset.val; state.inspFilters.page = 1; syncInspUI(); renderInspectionTable(); });
+    });
     document.querySelectorAll("#insp-board-chips .chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => { state.inspFilters.board = btn.dataset.val; state.inspFilters.page = 1; syncInspUI(); renderInspectionTable(); });
     });
     document.querySelectorAll("#insp-stage-chips .chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => { state.inspFilters.stage = btn.dataset.val; state.inspFilters.page = 1; syncInspUI(); renderInspectionTable(); });
+    });
+    document.querySelectorAll("#insp-batch-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.inspFilters.batch = btn.dataset.val; state.inspFilters.page = 1; syncInspUI(); renderInspectionTable(); });
     });
     if ($("insp-keyword")) {
       $("insp-keyword").addEventListener("input", (e) => {
@@ -3106,7 +3166,7 @@
     if ($("insp-reset")) {
       $("insp-reset").addEventListener("click", () => {
         const sz = state.inspFilters.pageSize;
-        state.inspFilters = { board: "全部", stage: "全部", keyword: "", page: 1, pageSize: sz };
+        state.inspFilters = { year: "全部", board: "全部", stage: "全部", batch: "全部", keyword: "", page: 1, pageSize: sz };
         syncInspUI(); renderInspectionTable();
       });
     }
@@ -3115,16 +3175,24 @@
     if ($("insp-next-page")) $("insp-next-page").addEventListener("click", () => { state.inspFilters.page += 1; renderInspectionTable(); });
 
     const syncRegUI = () => {
+      document.querySelectorAll("#reg-year-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.regFilters.year));
       document.querySelectorAll("#reg-org-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.regFilters.regulator));
       document.querySelectorAll("#reg-stage-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.regFilters.stage));
+      document.querySelectorAll("#reg-cat-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.regFilters.category));
       if ($("reg-keyword")) $("reg-keyword").value = state.regFilters.keyword;
       if ($("reg-clear-search")) $("reg-clear-search").classList.toggle("hidden", !state.regFilters.keyword);
     };
+    document.querySelectorAll("#reg-year-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.regFilters.year = btn.dataset.val; state.regFilters.page = 1; syncRegUI(); renderRegulatoryTable(); });
+    });
     document.querySelectorAll("#reg-org-chips .chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => { state.regFilters.regulator = btn.dataset.val; state.regFilters.page = 1; syncRegUI(); renderRegulatoryTable(); });
     });
     document.querySelectorAll("#reg-stage-chips .chip-btn").forEach((btn) => {
       btn.addEventListener("click", () => { state.regFilters.stage = btn.dataset.val; state.regFilters.page = 1; syncRegUI(); renderRegulatoryTable(); });
+    });
+    document.querySelectorAll("#reg-cat-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.regFilters.category = btn.dataset.val; state.regFilters.page = 1; syncRegUI(); renderRegulatoryTable(); });
     });
     if ($("reg-keyword")) {
       $("reg-keyword").addEventListener("input", (e) => {
@@ -3141,7 +3209,7 @@
     if ($("reg-reset")) {
       $("reg-reset").addEventListener("click", () => {
         const sz = state.regFilters.pageSize;
-        state.regFilters = { regulator: "全部", stage: "全部", keyword: "", page: 1, pageSize: sz };
+        state.regFilters = { year: "全部", regulator: "全部", stage: "全部", category: "全部", keyword: "", page: 1, pageSize: sz };
         syncRegUI(); renderRegulatoryTable();
       });
     }
