@@ -905,7 +905,9 @@
 
     // 若选中了省份或非默认排序，高亮高级筛选按钮并在跳转时自动展开
     const hasAdv = state.filters.province !== "全部" || state.filters.sortBy !== "update_date";
-    $("btn-toggle-advanced").classList.toggle("active-toggle", hasAdv || !$("advanced-drawer").classList.contains("hidden"));
+    if ($("btn-toggle-advanced")) {
+      $("btn-toggle-advanced").classList.toggle("active-toggle", hasAdv || ($("advanced-drawer") && !$("advanced-drawer").classList.contains("hidden")));
+    }
   }
 
   function normalizeCompanyKey(name) {
@@ -3223,11 +3225,13 @@
       $("filter-keyword").focus();
     });
 
-    $("btn-toggle-advanced").addEventListener("click", () => {
-      const drawer = $("advanced-drawer");
-      drawer.classList.toggle("hidden");
-      syncDynamicsFilterUI();
-    });
+    if ($("btn-toggle-advanced")) {
+      $("btn-toggle-advanced").addEventListener("click", () => {
+        const drawer = $("advanced-drawer");
+        if (drawer) drawer.classList.toggle("hidden");
+        syncDynamicsFilterUI();
+      });
+    }
 
     $("filter-sort").addEventListener("change", (e) => {
       state.filters.sortBy = e.target.value;
@@ -3718,6 +3722,7 @@
 
     setupScrollFadeAndSticky();
     bindEvents();
+    initAiAssistant();
     try {
       if ($("source-dot")) $("source-dot").className = "source-dot";
       if ($("source-text")) $("source-text").textContent = "实时数据 · IPOFlow";
@@ -3765,6 +3770,281 @@
     } catch (err) {
       console.error(err);
       if ($("overview-date-text")) $("overview-date-text").textContent = "数据加载失败，请先运行数据脚本";
+    }
+  }
+
+  // ==================== AI 模式助手（智谱 GLM-4-Flash 免费版） ====================
+  function initAiAssistant() {
+    const drawer = $("ai-drawer");
+    const backdrop = $("ai-drawer-backdrop");
+    const msgBox = $("ai-messages");
+    const inputEl = $("ai-input");
+    const sendBtn = $("ai-send-btn");
+    const keyPanel = $("ai-key-panel");
+    const keyInput = $("ai-key-input");
+    const ctxBar = $("ai-context-bar");
+    if (!drawer || !msgBox) return;
+
+    const STORAGE_KEY = "ipoflow_zhipu_key";
+    let chatHistory = [];
+    let isBusy = false;
+
+    if (keyInput) keyInput.value = localStorage.getItem(STORAGE_KEY) || "";
+
+    const countBy = (arr, fn) => {
+      const m = {};
+      for (const item of arr) {
+        const k = fn(item) || "其他";
+        m[k] = (m[k] || 0) + 1;
+      }
+      return Object.entries(m)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([k, v]) => `${k}:${v}`)
+        .join("，");
+    };
+
+    const buildAiContext = () => {
+      if (state.currentDetailRec && !$("view-detail").classList.contains("hidden")) {
+        const r = state.currentDetailRec;
+        const insp = getInspectionForCompany(r.company);
+        const regs = getRegulatoryForCompany(r.company);
+        ctxBar.textContent = `📌 当前上下文：项目详情 · ${r.company}`;
+        return [
+          `当前正在查看项目详情：${r.company}（${r.exchange} · ${r.board}，当前状态：${r.raw_status || r.stage}）`,
+          `行业：${r.industry || "—"}；注册地：${r.province || "—"}；保荐机构：${(r.sponsors || []).join("、") || "—"}`,
+          `律师：${(r.law_firms || []).join("、") || "—"}；会计师：${(r.accounting_firms || []).join("、") || "—"}`,
+          `受理日期：${r.accept_date || "—"}；更新日期：${r.update_date || "—"}`,
+          insp ? `现场检查记录：${insp.batch || "抽中"}（${insp.draw_date || ""}）` : "现场检查记录：无",
+          regs.length ? `监管措施记录：${regs.length}条（最新：${regs[0].title}）` : "监管措施记录：无",
+        ].join("\n");
+      }
+
+      if (state.activeTab === "港股IPO" && state.hkRecords.length) {
+        const list = getFilteredHk();
+        ctxBar.textContent = `📌 当前上下文：港股IPO（匹配 ${list.length} / 总计 ${state.hkRecords.length} 家）`;
+        return [
+          `当前视图：港股IPO，总库 ${state.hkRecords.length} 家，当前筛选匹配 ${list.length} 家。`,
+          `上市架构分布：${countBy(list, (x) => x.structure)}`,
+          `港交所状态分布：${countBy(list, (x) => x.hkex_status)}`,
+          `证监会备案分布：${countBy(list, (x) => x.csrc_status)}`,
+          `前8条样本：${list.slice(0, 8).map((x) => `${x.company}(${x.structure}/${x.hkex_status}/${x.csrc_status})`).join("；")}`,
+        ].join("\n");
+      }
+
+      if (state.activeTab === "现场检查" && state.inspectionRecords.length) {
+        const list = getFilteredInspection();
+        ctxBar.textContent = `📌 当前上下文：现场检查（匹配 ${list.length} / 总计 ${state.inspectionRecords.length} 家）`;
+        return [
+          `当前视图：现场检查，总计 ${state.inspectionRecords.length} 家，当前筛选 ${list.length} 家。`,
+          `板块分布：${countBy(list, (x) => x.board)}`,
+          `状态分布：${countBy(list, (x) => x.stage)}`,
+          `保荐机构Top：${countBy(list, (x) => normalizeBrokerName((x.sponsors || []).join("、") || x.sponsor))}`,
+        ].join("\n");
+      }
+
+      if (state.activeTab === "监管措施" && state.regulatoryRecords.length) {
+        const list = getFilteredRegulatory();
+        ctxBar.textContent = `📌 当前上下文：监管措施（匹配 ${list.length} / 总计 ${state.regulatoryRecords.length} 条）`;
+        return [
+          `当前视图：监管措施，总计 ${state.regulatoryRecords.length} 条，当前筛选 ${list.length} 条。`,
+          `监管机构：${countBy(list, (x) => x.regulator)}；处罚类别：${countBy(list, (x) => x.category)}`,
+          `涉及审核状态：${countBy(list, (x) => x.stage)}`,
+        ].join("\n");
+      }
+
+      const sourceList = state.records.length ? getFilteredRecords() : state.activeRecords;
+      const totalAll = state.records.length || state.activeRecords.length;
+      ctxBar.textContent = `📌 当前上下文：A股IPO ${state.activeTab}（匹配 ${sourceList.length} / 库内 ${totalAll} 家）`;
+      return [
+        `当前视图：${state.activeTab}，库内 ${totalAll} 家，当前筛选结果 ${sourceList.length} 家。`,
+        `交易所分布：${countBy(sourceList, (x) => x.exchange)}`,
+        `板块分布：${countBy(sourceList, (x) => x.board)}`,
+        `审核阶段分布：${countBy(sourceList, (x) => x.stage)}`,
+        `注册地Top省份：${countBy(sourceList, (x) => x.province)}`,
+        `保荐机构Top：${countBy(sourceList, (x) => normalizeBrokerName((x.sponsors || []).join("、")))}`,
+        `最新样本(前10条)：${sourceList.slice(0, 10).map((x) => `${x.company}[${x.board}/${x.raw_status || x.stage}/${(x.sponsors || [])[0] || "—"}]`).join("；")}`,
+      ].join("\n");
+    };
+
+    const applyAiFilter = async (spec) => {
+      if (!spec || typeof spec !== "object") return;
+      const tab = spec.tab || "审核动态";
+      if (tab === "港股IPO") {
+        if (spec.structure) state.hkFilters.structure = spec.structure;
+        if (spec.hkexStatus) state.hkFilters.hkexStatus = spec.hkexStatus;
+        if (spec.csrcStatus) state.hkFilters.csrcStatus = spec.csrcStatus;
+        if (spec.keyword !== undefined) state.hkFilters.keyword = spec.keyword;
+        state.hkFilters.page = 1;
+        await switchSubTab("港股IPO");
+        renderHkTable();
+      } else {
+        await switchSubTab("审核动态");
+        if (spec.exchange) state.filters.exchange = spec.exchange;
+        if (spec.board) state.filters.board = spec.board;
+        if (spec.stage) state.filters.stage = spec.stage;
+        if (spec.province) state.filters.province = spec.province;
+        if (spec.keyword !== undefined) state.filters.keyword = spec.keyword;
+        state.filters.page = 1;
+        syncDynamicsFilterUI();
+        renderDynamicsTable();
+      }
+      closeDrawer();
+    };
+
+    const renderAiMarkdown = (rawText) => {
+      let filterSpec = null;
+      const cleanText = String(rawText || "").replace(/\[\[FILTER:(\{.*?\})\]\]/g, (_, jsonStr) => {
+        try {
+          filterSpec = JSON.parse(jsonStr);
+        } catch (_) {}
+        return "";
+      }).trim();
+
+      let html = escapeHtml(cleanText)
+        .replace(/`([^`]+)`/g, "<code>$1</code>")
+        .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+        .replace(/^###\s+(.+)$/gm, "<div style='font-weight:700;margin:8px 0 4px;color:#111827;'>$1</div>")
+        .replace(/^[-*]\s+(.+)$/gm, "<li>$1</li>");
+      html = html.replace(/(<li>[\s\S]*?<\/li>)/g, "<ul>$1</ul>").replace(/<\/ul>\s*<ul>/g, "");
+      html = html.replace(/\n/g, "<br>");
+      return { html, filterSpec };
+    };
+
+    const appendMsg = (role, text, isHtml = false) => {
+      const div = document.createElement("div");
+      div.className = `ai-msg ai-msg-${role}`;
+      if (isHtml) {
+        div.innerHTML = text;
+      } else if (role === "assistant") {
+        const { html, filterSpec } = renderAiMarkdown(text);
+        div.innerHTML = html;
+        if (filterSpec) {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "ai-apply-filter-btn";
+          btn.textContent = "🎯 一键应用筛选条件到列表";
+          btn.addEventListener("click", () => applyAiFilter(filterSpec));
+          div.appendChild(btn);
+        }
+      } else {
+        div.textContent = text;
+      }
+      msgBox.appendChild(div);
+      msgBox.scrollTop = msgBox.scrollHeight;
+      return div;
+    };
+
+    const showWelcome = () => {
+      if (msgBox.children.length > 0) return;
+      appendMsg(
+        "assistant",
+        "你好！我是基于 **智谱 GLM-4-Flash（免费版）** 的 IPO 智览 AI 助手。你可以直接向我提问：\n- **AI 查找**：如「找科创板中信建投保荐的已问询企业」\n- **AI 分析**：如「分析当前排队结构与现场检查撤回风险」\n- **AI 统计简报**：点击上方快捷指令一键生成专业简报"
+      );
+    };
+
+    const openDrawer = () => {
+      buildAiContext();
+      showWelcome();
+      backdrop.classList.remove("hidden");
+      drawer.classList.remove("hidden");
+      setTimeout(() => inputEl && inputEl.focus(), 80);
+    };
+
+    const closeDrawer = () => {
+      backdrop.classList.add("hidden");
+      drawer.classList.add("hidden");
+    };
+
+    const sendMessage = async (customText) => {
+      if (isBusy) return;
+      const text = (customText !== undefined ? customText : inputEl.value).trim();
+      if (!text) return;
+      if (customText === undefined) inputEl.value = "";
+
+      appendMsg("user", text);
+      const loadingEl = appendMsg("assistant", "正在连接 GLM-4-Flash 思考分析中...", true);
+      isBusy = true;
+      sendBtn.disabled = true;
+
+      const ctxData = buildAiContext();
+      const systemPrompt = [
+        "你是「IPO 智览」专业投行与资本市场研究助手，基于真实实时看板数据用简体中文回答。",
+        "严格约束：所有数量、比例、机构名称只能依据下方【实时看板上下文】作答，严禁编造具体公司名称或统计数字。",
+        "当用户希望查找/筛选/列出符合特定条件（交易所、板块、审核阶段、省份、保荐机构、关键词或港股IPO）的项目时，请在回答最末尾附加一行结构化筛选标记，格式严格如下：",
+        '[[FILTER:{"tab":"审核动态","exchange":"全部","board":"科创板","stage":"问询","province":"全部","keyword":"中信建投"}]]',
+        "其中 stage 可选值：全部、仅看在审、受理、问询、上市委、提交注册、注册同意、中止、终止；board 可选：全部、沪主板、科创板、深主板、创业板、北证；exchange 可选：全部、上交所、深交所、北交所。",
+        "\n【实时看板上下文】\n" + ctxData,
+      ].join("\n");
+
+      chatHistory.push({ role: "user", content: text });
+      const apiMessages = [{ role: "system", content: systemPrompt }, ...chatHistory.slice(-8)];
+
+      try {
+        const resp = await fetch("/api/ai-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: apiMessages,
+            apiKey: localStorage.getItem(STORAGE_KEY) || "",
+          }),
+        });
+        const data = await resp.json();
+        loadingEl.remove();
+        if (!resp.ok || !data.ok) {
+          if (data && data.needKey && keyPanel) {
+            keyPanel.classList.remove("hidden");
+          }
+          appendMsg("assistant", `⚠️ ${data.error || "调用 GLM-4-Flash 失败，请检查配置。"}`);
+          chatHistory.pop();
+          return;
+        }
+        const reply = data.reply || "（未返回有效内容）";
+        chatHistory.push({ role: "assistant", content: reply });
+        appendMsg("assistant", reply);
+      } catch (err) {
+        loadingEl.remove();
+        chatHistory.pop();
+        appendMsg("assistant", `⚠️ 无法连接 AI 透传接口（${err.message || "网络异常"}）。若为本地直接双击打开，请运行 \`python3 server.py\` 访问。`);
+      } finally {
+        isBusy = false;
+        sendBtn.disabled = false;
+      }
+    };
+
+    if ($("btn-ai-mode")) $("btn-ai-mode").addEventListener("click", openDrawer);
+    if ($("ai-btn-close")) $("ai-btn-close").addEventListener("click", closeDrawer);
+    if (backdrop) backdrop.addEventListener("click", closeDrawer);
+    if ($("ai-btn-clear")) {
+      $("ai-btn-clear").addEventListener("click", () => {
+        chatHistory = [];
+        msgBox.innerHTML = "";
+        showWelcome();
+      });
+    }
+    if ($("ai-btn-key") && keyPanel) {
+      $("ai-btn-key").addEventListener("click", () => keyPanel.classList.toggle("hidden"));
+    }
+    if ($("ai-key-save") && keyInput) {
+      $("ai-key-save").addEventListener("click", () => {
+        const val = keyInput.value.trim();
+        if (val) localStorage.setItem(STORAGE_KEY, val);
+        else localStorage.removeItem(STORAGE_KEY);
+        keyPanel.classList.add("hidden");
+        appendMsg("assistant", val ? "✅ 已保存智谱免费 API Key（仅存于当前浏览器），现在可直接提问！" : "已清空本地 API Key。");
+      });
+    }
+    document.querySelectorAll(".ai-quick-chip").forEach((chip) => {
+      chip.addEventListener("click", () => sendMessage(chip.dataset.prompt || chip.textContent));
+    });
+    if (sendBtn) sendBtn.addEventListener("click", () => sendMessage());
+    if (inputEl) {
+      inputEl.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      });
     }
   }
 

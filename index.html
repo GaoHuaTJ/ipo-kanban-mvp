@@ -19,7 +19,7 @@
   </script>
   <title>IPO 智览 · 首发上市全景看板</title>
   <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
-  <link rel="stylesheet" href="./assets/styles.css?v=20261127j" />
+  <link rel="stylesheet" href="./assets/styles.css?v=20261127k" />
   <script>
     (function () {
       if (window.location.protocol === "file:") return;
@@ -286,9 +286,9 @@
             <button id="btn-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
           </div>
 
-          <button id="btn-toggle-advanced" class="action-btn primary" type="button">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="8" y1="12" x2="16" y2="12"></line><line x1="11" y1="18" x2="13" y2="18"></line></svg>
-            <span>高级筛选</span>
+          <button id="btn-ai-mode" class="action-btn primary ai-mode-btn" type="button" title="打开 AI 助手（智谱 GLM-4-Flash 免费版）">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3L12 3z"/></svg>
+            <span>AI 模式</span>
           </button>
         </div>
 
@@ -1120,7 +1120,52 @@
     </section>
   </main>
 
+  <!-- 右侧 AI 助手抽屉（智谱 GLM-4-Flash 免费版） -->
+  <div id="ai-drawer-backdrop" class="ai-drawer-backdrop hidden" aria-hidden="true"></div>
+  <aside id="ai-drawer" class="ai-drawer hidden" aria-label="IPO 智览 AI 助手">
+    <div class="ai-drawer-header">
+      <div class="ai-drawer-title-wrap">
+        <span class="ai-sparkle-badge">✨ AI 模式</span>
+        <span class="ai-model-tag">GLM-4-Flash · 免费</span>
+      </div>
+      <div class="ai-drawer-actions">
+        <button id="ai-btn-key" class="ai-icon-btn" type="button" title="配置免费智谱 API Key">⚙ 设置</button>
+        <button id="ai-btn-clear" class="ai-icon-btn" type="button" title="清空对话">清空</button>
+        <button id="ai-btn-close" class="ai-icon-btn ai-close-btn" type="button" title="关闭">×</button>
+      </div>
+    </div>
+
+    <div id="ai-key-panel" class="ai-key-panel hidden">
+      <div class="ai-key-desc">
+        接入智谱开放平台免费模型 <b>GLM-4-Flash</b>（零费用）。若服务端已配置 <code>ZHIPU_API_KEY</code> 可直接使用；未配置时请填入个人免费 Key（仅存于本地浏览器）：
+        <a href="https://open.bigmodel.cn/" target="_blank" rel="noopener noreferrer">免费申请智谱 Key ↗</a>
+      </div>
+      <div class="ai-key-input-row">
+        <input id="ai-key-input" type="password" placeholder="粘贴智谱 API Key（格式如 id.secret）" autocomplete="off" />
+        <button id="ai-key-save" class="action-btn sm primary" type="button">保存</button>
+      </div>
+    </div>
+
+    <div id="ai-context-bar" class="ai-context-bar">
+      📌 当前上下文：A股 IPO 审核动态
+    </div>
+
+    <div class="ai-quick-prompts">
+      <button class="ai-quick-chip" type="button" data-prompt="请基于当前页面数据生成一份简明扼要的统计简报（含总量、板块结构、阶段分布及头部机构特征）。">📊 统计简报</button>
+      <button class="ai-quick-chip" type="button" data-prompt="帮我查找科创板由中信建投保荐且当前处于已问询状态的IPO项目，并给出筛选指令。">🔍 AI 查找示例</button>
+      <button class="ai-quick-chip" type="button" data-prompt="请分析当前在审项目的排队结构、撤否风险及现场检查/监管关注要点。">⚖️ 风险与结构分析</button>
+      <button class="ai-quick-chip" type="button" data-prompt="请统计并点评当前列表中的头部保荐机构储备格局与集中度。">🏢 保荐机构简析</button>
+    </div>
+
+    <div id="ai-messages" class="ai-messages"></div>
+
+    <div class="ai-input-shell">
+      <textarea id="ai-input" class="ai-input" rows="2" placeholder="输入自然语言查找条件、项目分析或简报需求（Enter 发送，Shift+Enter 换行）..."></textarea>
+      <button id="ai-send-btn" class="action-btn primary ai-send-btn" type="button">发送</button>
+    </div>
+  </aside>
+
   <!-- 主应用逻辑（按路由按需懒加载 JSON 数据与 ECharts，加速首屏） -->
-  <script defer src="./assets/app.js?v=20261127j"></script>
+  <script defer src="./assets/app.js?v=20261127k"></script>
 </body>
 </html>

@@ -557,8 +557,24 @@ def query_project_detail(company, exchange, security_code=""):
 
 
 class IpoKanbanHandler(SimpleHTTPRequestHandler):
+    def do_OPTIONS(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/ai-chat":
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+            return
+        self.send_response(204)
+        self.end_headers()
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/ai-chat":
+            has_key = bool(os.environ.get("ZHIPU_API_KEY", "").strip())
+            self.send_json(200, {"ok": True, "serverConfigured": has_key, "model": "glm-4-flash"})
+            return
         if parsed.path == "/api/project-detail":
             self.handle_project_detail(parsed.query)
             return
@@ -570,6 +586,72 @@ class IpoKanbanHandler(SimpleHTTPRequestHandler):
             if not rel or not os.path.isfile(os.path.join(os.getcwd(), rel)):
                 self.path = "/index.html"
         super().do_GET()
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path == "/api/ai-chat":
+            self.handle_ai_chat()
+            return
+        self.send_json(404, {"ok": False, "error": "Not Found"})
+
+    def handle_ai_chat(self):
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+            raw = self.rfile.read(length) if length > 0 else b"{}"
+            body = json.loads(raw.decode("utf-8", errors="ignore"))
+        except Exception:
+            self.send_json(400, {"ok": False, "error": "请求体 JSON 格式错误"})
+            return
+
+        messages = body.get("messages") if isinstance(body, dict) else None
+        if not isinstance(messages, list) or not messages:
+            self.send_json(400, {"ok": False, "error": "缺少 messages 对话内容"})
+            return
+
+        api_key = os.environ.get("ZHIPU_API_KEY", "").strip() or str((body or {}).get("apiKey") or "").strip()
+        if not api_key:
+            self.send_json(
+                401,
+                {
+                    "ok": False,
+                    "needKey": True,
+                    "error": "尚未配置智谱 GLM-4-Flash 免费 API Key，请在右侧面板设置或启动服务时设置 ZHIPU_API_KEY。",
+                },
+            )
+            return
+
+        try:
+            payload = json.dumps(
+                {"model": "glm-4-flash", "messages": messages, "temperature": 0.3, "max_tokens": 1800},
+                ensure_ascii=False,
+            ).encode("utf-8")
+            req = urllib.request.Request(
+                "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+                data=payload,
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {api_key}",
+                    "User-Agent": UA,
+                },
+                method="POST",
+            )
+            ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, timeout=30, context=ctx) as resp:
+                res_data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            reply = (
+                ((res_data.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+            )
+            self.send_json(200, {"ok": True, "model": res_data.get("model") or "glm-4-flash", "reply": reply})
+        except urllib.error.HTTPError as exc:
+            err_body = exc.read().decode("utf-8", errors="ignore")
+            try:
+                err_json = json.loads(err_body)
+                msg = (err_json.get("error") or {}).get("message") or err_body
+            except Exception:
+                msg = err_body or str(exc)
+            self.send_json(exc.code, {"ok": False, "error": f"智谱接口错误: {msg}"})
+        except Exception as exc:
+            self.send_json(502, {"ok": False, "error": f"AI 接口调用失败: {exc}"})
 
     def handle_tutoring_detail(self, query_str):
         params = urllib.parse.parse_qs(query_str)
