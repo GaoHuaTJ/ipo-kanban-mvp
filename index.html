@@ -19,7 +19,7 @@
   </script>
   <title>IPO 智览 · 首发上市全景看板</title>
   <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
-  <link rel="stylesheet" href="./assets/styles.css?v=20261127i" />
+  <link rel="stylesheet" href="./assets/styles.css?v=20261127j" />
   <script>
     (function () {
       if (window.location.protocol === "file:") return;
@@ -57,12 +57,9 @@
       <nav class="top-nav" aria-label="主导航">
         <a class="top-nav-item active" href="javascript:void(0)">首发上市</a>
         <a class="top-nav-item" href="javascript:void(0)" title="二期规划">再融重组</a>
-        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">固定收益</a>
         <a class="top-nav-item" href="javascript:void(0)" title="二期规划">信披检索</a>
-        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">监管处罚</a>
         <a class="top-nav-item" href="javascript:void(0)" title="二期规划">证券法规</a>
         <a class="top-nav-item" href="javascript:void(0)" title="二期规划">上市公司</a>
-        <a class="top-nav-item" href="javascript:void(0)" title="二期规划">中介机构</a>
       </nav>
 
       <div class="header-right">
@@ -81,8 +78,9 @@
       <span id="active-subtab-pill" class="page-title-pill">全景图</span>
     </div>
 
-    <!-- 二级 Tab 栏（现代化悬浮胶囊导航） -->
-    <div class="sub-tabs-shell">
+    <!-- 二级 Tab 栏（滚动时吸顶保留） -->
+    <div id="sub-tabs-sticky-bar" class="sub-tabs-sticky-bar">
+      <div class="sub-tabs-shell">
       <div class="sub-tabs" role="tablist">
         <button class="sub-tab active" data-tab="全景图" role="tab">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -120,6 +118,7 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V7l8-4v18"/><path d="M19 21V11l-6-4"/></svg>
           <span>港股IPO</span>
         </button>
+      </div>
       </div>
     </div>
 
@@ -1122,6 +1121,6 @@
   </main>
 
   <!-- 主应用逻辑（按路由按需懒加载 JSON 数据与 ECharts，加速首屏） -->
-  <script defer src="./assets/app.js?v=20261127i"></script>
+  <script defer src="./assets/app.js?v=20261127j"></script>
 </body>
 </html>

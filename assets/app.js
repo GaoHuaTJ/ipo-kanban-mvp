@@ -3657,6 +3657,66 @@
   }
 
   async function init() {
+    const setupScrollFadeAndSticky = () => {
+      const subBar = $("sub-tabs-sticky-bar");
+      const topHeader = document.querySelector(".top-header");
+      const titleRow = document.querySelector(".page-title-row");
+
+      const updateStickyH = () => {
+        if (subBar) {
+          document.documentElement.style.setProperty("--sticky-subtabs-h", `${subBar.offsetHeight}px`);
+        }
+      };
+
+      const updateFade = () => {
+        const y = window.scrollY || window.pageYOffset || 0;
+        // 顶部导航与「首发上市」标题随页面上滑逐渐淡出（10px -> 95px）
+        const headerOpacity = y <= 10 ? 1 : y >= 95 ? 0 : Math.max(0, 1 - (y - 10) / 85);
+        if (topHeader) {
+          topHeader.style.opacity = String(headerOpacity);
+          topHeader.style.pointerEvents = headerOpacity < 0.05 ? "none" : "";
+        }
+        if (titleRow) {
+          titleRow.style.opacity = String(headerOpacity);
+          titleRow.style.pointerEvents = headerOpacity < 0.05 ? "none" : "";
+        }
+        // 筛选区随页面上滑接近标签栏时逐渐淡出
+        const subBottom = subBar ? subBar.getBoundingClientRect().bottom : 60;
+        document.querySelectorAll(".filter-minimal").forEach((el) => {
+          if (el.closest(".hidden")) return;
+          const rect = el.getBoundingClientRect();
+          // 当筛选区顶部进入吸顶标签栏下方 90px 范围内逐渐淡出至消失
+          const dist = rect.bottom - subBottom;
+          let op = 1;
+          if (y > 40 && dist < 110) {
+            op = dist <= 15 ? 0 : Math.max(0, Math.min(1, (dist - 15) / 95));
+          }
+          el.style.opacity = String(op);
+          el.style.pointerEvents = op < 0.05 ? "none" : "";
+        });
+      };
+
+      let ticking = false;
+      const onScroll = () => {
+        if (!ticking) {
+          ticking = true;
+          requestAnimationFrame(() => {
+            updateFade();
+            ticking = false;
+          });
+        }
+      };
+
+      updateStickyH();
+      updateFade();
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", () => {
+        updateStickyH();
+        updateFade();
+      });
+    };
+
+    setupScrollFadeAndSticky();
     bindEvents();
     try {
       if ($("source-dot")) $("source-dot").className = "source-dot";

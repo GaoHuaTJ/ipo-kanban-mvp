@@ -46,9 +46,9 @@ body {
   background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border-light);
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 100;
+  transition: opacity 0.18s ease;
 }
 
 .top-header-inner {
@@ -200,6 +200,7 @@ body {
   margin-bottom: 16px;
   flex-wrap: wrap;
   gap: 12px;
+  transition: opacity 0.18s ease;
 }
 
 .page-title {
@@ -229,12 +230,22 @@ body {
   color: var(--text-muted);
 }
 
+.sub-tabs-sticky-bar {
+  position: sticky;
+  top: 0;
+  z-index: 98;
+  background: rgba(255, 255, 255, 0.97);
+  backdrop-filter: blur(10px);
+  margin: 0 -24px 14px;
+  padding: 8px 24px;
+}
+
 .sub-tabs-shell {
   background: linear-gradient(180deg, #f3f6fc 0%, #eef3fb 100%);
   border: 1px solid #e1e8f5;
   border-radius: 14px;
   padding: 5px;
-  margin-bottom: 24px;
+  margin-bottom: 0;
   box-shadow: inset 0 1px 2px rgba(26, 115, 232, 0.04);
 }
 
@@ -565,17 +576,18 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  transition: opacity 0.18s ease;
 }
 
-/* 搜索栏吸顶容器：滚动到顶部导航栏下方时固定吸附，表格内容从下方平滑滑过 */
+/* 搜索栏吸顶容器：滚动时紧贴二级标签栏下方固定吸附，表格内容从下方平滑滑过 */
 .sticky-search-shell {
   position: sticky;
-  top: 60px;
+  top: var(--sticky-subtabs-h, 60px);
   z-index: 90;
-  background: rgba(255, 255, 255, 0.96);
+  background: rgba(255, 255, 255, 0.97);
   backdrop-filter: blur(10px);
   margin: 4px -24px 14px;
-  padding: 12px 24px;
+  padding: 10px 24px 12px;
   border-bottom: 1px solid rgba(232, 234, 237, 0.85);
 }
 
@@ -1478,9 +1490,14 @@ body {
     padding: 3px 10px;
   }
 
+  .sub-tabs-sticky-bar {
+    margin: 0 -12px 10px;
+    padding: 6px 12px;
+  }
+
   .sub-tabs-shell {
     padding: 5px;
-    margin-bottom: 12px;
+    margin-bottom: 0;
   }
 
   .sub-tabs {
@@ -1628,7 +1645,7 @@ body {
   }
 
   .sticky-search-shell {
-    top: 54px;
+    top: var(--sticky-subtabs-h, 118px);
     margin: 4px -12px 12px;
     padding: 10px 12px;
   }
