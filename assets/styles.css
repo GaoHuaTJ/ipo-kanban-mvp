@@ -2253,3 +2253,105 @@ body {
   color: var(--g-blue);
   text-decoration: underline;
 }
+
+/* ==================== 港股 IPO 样式 ==================== */
+.hk-badge-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.hk-tag-18A { background: #1677ff; }
+.hk-tag-18C { background: #0d9488; }
+.hk-tag-WVR { background: #722ed1; }
+.hk-tag-二次上市 { background: #475569; }
+
+.hk-code-pill {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #1967d2;
+  background: #e8f0fe;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-right: 6px;
+  font-weight: 600;
+}
+
+.hk-status-处理中 { background: #e8f0fe; color: #1967d2; }
+.hk-status-已聆讯 { background: #fef7e0; color: #b06000; }
+.hk-status-已上市 { background: #e6f4ea; color: #137333; }
+.hk-status-失效   { background: #f1f3f4; color: #5f6368; }
+.hk-status-撤回被拒 { background: #fce8e6; color: #c5221f; }
+
+.csrc-status-备案同意 { background: #e6f4ea; color: #137333; }
+.csrc-status-备案受理 { background: #e8f0fe; color: #1967d2; }
+.csrc-status-备案反馈 { background: #fef7e0; color: #b06000; }
+.csrc-status-尚未接收 { background: #f3e8fd; color: #7627bb; }
+.csrc-status-新规前批复,
+.csrc-status-新规前豁免,
+.csrc-status-不适用 { background: #f1f3f4; color: #5f6368; }
+
+.hk-sponsors-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sortable-th:hover {
+  color: var(--g-blue);
+}
+
+.hk-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 16px;
+}
+.hk-modal-card {
+  background: #fff;
+  border-radius: 14px;
+  max-width: 680px;
+  width: 100%;
+  max-height: 82vh;
+  overflow-y: auto;
+  padding: 22px 24px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.18);
+}
+.hk-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eef0f3;
+  margin-bottom: 14px;
+}
+.hk-modal-close {
+  border: none;
+  background: #f1f3f4;
+  color: #3c4043;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.hk-modal-close:hover { background: #e2e8f0; }

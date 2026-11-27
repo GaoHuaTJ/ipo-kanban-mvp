@@ -19,7 +19,7 @@
   </script>
   <title>IPO 智览 · 首发上市全景看板</title>
   <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
-  <link rel="stylesheet" href="./assets/styles.css?v=20261127f" />
+  <link rel="stylesheet" href="./assets/styles.css?v=20261127g" />
   <script>
     (function () {
       if (window.location.protocol === "file:") return;
@@ -564,8 +564,6 @@
         <div class="detail-tabs">
           <button class="detail-tab active" data-dtab="info">项目信息</button>
           <button class="detail-tab" data-dtab="docs">信披文件<span id="detail-docs-count"></span></button>
-          <button class="detail-tab" data-dtab="fundamental">企业基本面</button>
-          <button class="detail-tab" data-dtab="issue">发行动态</button>
         </div>
 
         <!-- 详情 Tab 1：项目信息 -->
@@ -586,24 +584,6 @@
           <div class="detail-card">
             <div class="detail-card-title">全部信息披露与问询回复文件</div>
             <div id="detail-docs-full" class="doc-list"></div>
-          </div>
-        </div>
-
-        <!-- 详情 Tab 3：发行动态（二期已点亮） -->
-        <div id="dtab-issue" class="hidden">
-          <div class="detail-card">
-            <div class="detail-card-title">新股发行与上市表现</div>
-            <div id="detail-issue-content"></div>
-          </div>
-        </div>
-
-        <!-- 详情 Tab 4：二期/三期规划 -->
-        <div id="dtab-future" class="hidden">
-          <div class="detail-card">
-            <div class="placeholder-card" style="margin:0;border:none;background:transparent;padding:24px 0;">
-              <h3 id="dtab-future-title">三期规划模块</h3>
-              <p id="dtab-future-desc"></p>
-            </div>
           </div>
         </div>
       </div>
@@ -1034,6 +1014,103 @@
       </div>
     </section>
 
+    <!-- 视图 8B：港股IPO（直连港交所披露易 + 证监会境外备案） -->
+    <section id="view-hk" class="hidden">
+      <div id="hk-kpi-grid" class="kpi-grid"></div>
+
+      <div class="filter-minimal">
+        <div class="filter-row">
+          <span class="filter-label">上市架构：</span>
+          <div id="hk-structure-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="A+H">A+H</button>
+            <button class="chip-btn" data-val="H股架构">H股架构</button>
+            <button class="chip-btn" data-val="红筹架构">红筹架构</button>
+            <button class="chip-btn" data-val="SPAC">SPAC</button>
+            <button class="chip-btn" data-val="境外企业">境外企业</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">港交所审核：</span>
+          <div id="hk-status-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="处理中">处理中</button>
+            <button class="chip-btn" data-val="已聆讯">已聆讯</button>
+            <button class="chip-btn" data-val="失效">失效</button>
+            <button class="chip-btn" data-val="已上市">已上市</button>
+            <button class="chip-btn" data-val="撤回/被拒">撤回/被拒</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">证监会备案：</span>
+          <div id="hk-csrc-chips" class="chip-list">
+            <button class="chip-btn active" data-val="全部">全部</button>
+            <button class="chip-btn" data-val="尚未接收">尚未接收</button>
+            <button class="chip-btn" data-val="备案受理">备案受理</button>
+            <button class="chip-btn" data-val="备案反馈">备案反馈</button>
+            <button class="chip-btn" data-val="备案同意">备案同意</button>
+            <button class="chip-btn" data-val="新规前批复">新规前批复</button>
+            <button class="chip-btn" data-val="新规前豁免">新规前豁免</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="sticky-search-shell">
+        <div class="search-hero-bar">
+          <div class="google-search-wrap">
+            <span class="search-icon" aria-hidden="true">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="hk-keyword" class="google-search-input" type="text" placeholder="查询发行人、总部地址、保荐机构、股票代码..." />
+            <button id="hk-clear-search" class="search-clear-btn hidden" type="button" title="清空搜索">×</button>
+          </div>
+          <button id="hk-reset" class="action-btn primary" type="button">重置</button>
+        </div>
+      </div>
+
+      <div class="table-toolbar">
+        <span id="hk-count">为您找到 0 条港股 IPO 记录</span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>发行人全称</th>
+              <th>申报板块</th>
+              <th>上市架构</th>
+              <th>港交所<br/>审核状态</th>
+              <th>证监会<br/>备案状态</th>
+              <th>注册地址</th>
+              <th>总部地址</th>
+              <th>保荐机构</th>
+              <th id="hk-sort-update" class="sortable-th" title="按更新日期排序">更新日期 ↕</th>
+              <th id="hk-sort-submit" class="sortable-th" title="按递表日期排序">递表日期 ↕</th>
+            </tr>
+          </thead>
+          <tbody id="hk-tbody"></tbody>
+        </table>
+      </div>
+
+      <div class="pagination-bar">
+        <div class="page-size-wrap">
+          <span>每页显示</span>
+          <select id="hk-page-size" class="select-control page-size-select" aria-label="每页显示条数">
+            <option value="10">10 条</option>
+            <option value="20" selected>20 条</option>
+            <option value="50">50 条</option>
+            <option value="100">100 条</option>
+          </select>
+        </div>
+        <div class="pagination">
+          <span id="hk-page-info" class="page-info">第 1 / 1 页</span>
+          <button id="hk-prev-page" class="action-btn sm">上一页</button>
+          <button id="hk-next-page" class="action-btn sm">下一页</button>
+        </div>
+      </div>
+    </section>
+
     <!-- 视图 8：后续规划占位页 -->
     <section id="view-placeholder" class="hidden">
       <div class="placeholder-card">
@@ -1045,6 +1122,6 @@
   </main>
 
   <!-- 主应用逻辑（按路由按需懒加载 JSON 数据与 ECharts，加速首屏） -->
-  <script defer src="./assets/app.js?v=20261127f"></script>
+  <script defer src="./assets/app.js?v=20261127g"></script>
 </body>
 </html>

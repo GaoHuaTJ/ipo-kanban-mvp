@@ -98,6 +98,7 @@
     regulatory: ["data/regulatory_data.json", "data/regulatory_data.js", "__REGULATORY_DATA__"],
     tutoring: ["data/tutoring_data.json", "data/tutoring_data.js", "__TUTORING_DATA__"],
     neeq: ["data/neeq_data.json", "data/neeq_data.js", "__NEEQ_DATA__"],
+    hk: ["data/hk_ipo_data.json", "data/hk_ipo_data.js", "__HK_IPO_DATA__"],
   };
 
   const state = {
@@ -110,6 +111,8 @@
     regulatoryRecords: [], // 三期：IPO监管措施清单
     tutoringRecords: [],  // 二期第2周：辅导备案公告
     neeqRecords: [],      // 二期第2周：新三板挂牌企业
+    hkRecords: [],        // 三期：港股IPO与境外备案
+    hkMeta: null,
     loaded: {},
     loading: {},
     currentDetailRec: null,
@@ -187,6 +190,16 @@
       keyword: "",
       page: 1,
       pageSize: 30,
+    },
+    hkFilters: {
+      structure: "全部",
+      hkexStatus: "全部",
+      csrcStatus: "全部",
+      keyword: "",
+      sortBy: "update_date",
+      sortDir: "desc",
+      page: 1,
+      pageSize: 20,
     },
   };
 
@@ -432,6 +445,10 @@
       } else if (key === "neeq") {
         state.neeqRecords = recs;
         updateNeeqChipCounts();
+      } else if (key === "hk") {
+        state.hkRecords = recs;
+        state.hkMeta = payload || {};
+        updateHkChipCounts();
       }
 
       state.loaded[key] = true;
@@ -1133,77 +1150,11 @@
     $("detail-docs-full").innerHTML = buildListHtml(docs || []);
   }
 
-  function findIssuanceForCompany(rec) {
-    if (!rec || !state.issuanceRecords.length) return null;
-    const normComp = String(rec.company || "").replace(/[（()）\s]/g, "");
-    const code = String(rec.security_code || "").trim();
-    return (
-      state.issuanceRecords.find(
-        (x) =>
-          (code && x.security_code && x.security_code === code) ||
-          (normComp && String(x.company || "").replace(/[（()）\s]/g, "") === normComp)
-      ) || null
-    );
-  }
-
-  function renderDetailIssueTab(rec) {
-    const container = $("detail-issue-content");
-    const iss = findIssuanceForCompany(rec);
-    if (!iss) {
-      container.innerHTML = `<div style="color:#70757a;font-size:13.5px;padding:18px 0;">该项目暂未进入新股发行阶段（尚无公开申购/定价记录）。</div>`;
-      return;
-    }
-
-    const chgText =
-      iss.first_day_chg !== null && iss.first_day_chg !== undefined
-        ? `<span class="${iss.first_day_chg >= 0 ? "chg-up" : "chg-down"}">${iss.first_day_chg >= 0 ? "+" : ""}${iss.first_day_chg.toFixed(2)}%</span>`
-        : "—";
-
-    const items = [
-      ["股票代码", iss.security_code || "—", false],
-      ["股票简称", iss.abbr || "—", false],
-      ["发行状态", `<span class="stage-tag iss-${escapeHtml(iss.status)}"><span class="status-dot"></span>${escapeHtml(iss.status)}</span>`, true],
-      ["拟上市板块", `${iss.exchange} · ${iss.board}`, false],
-      ["网上申购日期", iss.apply_date || "—", false],
-      ["上市日期", iss.listing_date || "待定", false],
-      ["发行价格", iss.issue_price !== null ? `${iss.issue_price.toFixed(2)} 元` : "待询价/定价", false],
-      ["募集资金总额", iss.raise_yi !== null ? `${iss.raise_yi.toFixed(2)} 亿元` : "—", false],
-      ["发行市盈率", iss.issue_pe !== null ? `${iss.issue_pe.toFixed(2)} 倍` : "—", false],
-      ["行业市盈率", iss.industry_pe !== null ? `${iss.industry_pe.toFixed(2)} 倍` : "—", false],
-      ["网上中签率", iss.lwr_pct !== null ? `${iss.lwr_pct.toFixed(4)}%` : "—", false],
-      ["上市首日涨跌幅", chgText, true],
-      ["主承销商", normalizeBrokerName(iss.underwriter) || "—", false],
-      ["发行方式", iss.issue_way || "—", false],
-    ];
-
-    container.innerHTML = `<div class="info-grid">${items
-      .map(
-        ([label, val, isHtml]) => `
-        <div class="info-item">
-          <span class="info-label">${label}</span>
-          <span class="info-value">${isHtml ? val : escapeHtml(val)}</span>
-        </div>`
-      )
-      .join("")}</div>`;
-  }
-
   async function switchDetailTab(dtab) {
-    document.querySelectorAll(".detail-tab").forEach((b) => b.classList.toggle("active", b.dataset.dtab === dtab));
-    $("dtab-info").classList.toggle("hidden", dtab !== "info");
-    $("dtab-docs").classList.toggle("hidden", dtab !== "docs");
-    $("dtab-issue").classList.toggle("hidden", dtab !== "issue");
-    $("dtab-future").classList.toggle("hidden", dtab !== "fundamental");
-
-    if (dtab === "issue") {
-      if (!state.loaded.issuance) {
-        $("detail-issue-content").innerHTML = `<div style="color:#8f959e;font-size:13px;padding:12px 0;">正在加载发行动态数据...</div>`;
-        await ensureDataset("issuance");
-      }
-      renderDetailIssueTab(state.currentDetailRec);
-    } else if (dtab === "fundamental") {
-      $("dtab-future-title").textContent = "企业基本面（三期规划）";
-      $("dtab-future-desc").textContent = "后续将接入新三板/北交所公开财报接口，展示近三年营收、净利润、毛利率与研发费用趋势。";
-    }
+    const safeTab = dtab === "docs" ? "docs" : "info";
+    document.querySelectorAll(".detail-tab").forEach((b) => b.classList.toggle("active", b.dataset.dtab === safeTab));
+    $("dtab-info").classList.toggle("hidden", safeTab !== "info");
+    $("dtab-docs").classList.toggle("hidden", safeTab !== "docs");
   }
 
   async function openProjectDetail(rec, defaultDetailTab = "info", options = {}) {
@@ -1220,6 +1171,7 @@
     $("view-issuance").classList.add("hidden");
     if ($("view-inspection")) $("view-inspection").classList.add("hidden");
     if ($("view-regulatory")) $("view-regulatory").classList.add("hidden");
+    if ($("view-hk")) $("view-hk").classList.add("hidden");
     $("view-tutoring").classList.add("hidden");
     $("view-tutoring-detail").classList.add("hidden");
     $("view-neeq").classList.add("hidden");
@@ -1708,7 +1660,7 @@
               update_date: item.listing_date || item.apply_date,
               source_url: "",
             },
-            "issue"
+            "info"
           );
         });
       });
@@ -2153,6 +2105,7 @@
     $("view-issuance").classList.add("hidden");
     if ($("view-inspection")) $("view-inspection").classList.add("hidden");
     if ($("view-regulatory")) $("view-regulatory").classList.add("hidden");
+    if ($("view-hk")) $("view-hk").classList.add("hidden");
     $("view-tutoring").classList.add("hidden");
     $("view-neeq").classList.add("hidden");
     $("view-placeholder").classList.add("hidden");
@@ -2735,6 +2688,203 @@
     });
   }
 
+  // ==================== 港股 IPO 视图 ====================
+  function updateHkChipCounts() {
+    const statusMap = {};
+    const csrcMap = {};
+    for (const r of state.hkRecords) {
+      statusMap[r.hkex_status] = (statusMap[r.hkex_status] || 0) + 1;
+      csrcMap[r.csrc_status] = (csrcMap[r.csrc_status] || 0) + 1;
+    }
+    document.querySelectorAll("#hk-status-chips .chip-btn").forEach((btn) => {
+      const val = btn.dataset.val;
+      if (val === "全部") return;
+      btn.textContent = `${val} (${statusMap[val] || 0})`;
+    });
+    document.querySelectorAll("#hk-csrc-chips .chip-btn").forEach((btn) => {
+      const val = btn.dataset.val;
+      if (val === "全部") return;
+      btn.textContent = `${val} (${csrcMap[val] || 0})`;
+    });
+  }
+
+  function renderHkKpis() {
+    const el = $("hk-kpi-grid");
+    if (!el) return;
+    const all = state.hkRecords;
+    const processing = all.filter((r) => r.hkex_status === "处理中").length;
+    const heard = all.filter((r) => r.hkex_status === "已聆讯").length;
+    const listed = all.filter((r) => r.hkex_status === "已上市").length;
+    const ahCount = all.filter((r) => r.structure === "A+H").length;
+    const csrcActive = all.filter((r) => ["备案受理", "备案反馈", "备案同意"].includes(r.csrc_status)).length;
+    const csrcDate = (state.hkMeta && state.hkMeta.csrc_table_date) || "每周更新";
+    el.innerHTML = `
+      <div class="kpi-card">
+        <span class="kpi-label">港股 IPO 全量库</span>
+        <span class="kpi-value">${all.length.toLocaleString()}</span>
+        <span class="kpi-sub">港交所披露易主板 + GEM（含 A+H ${ahCount} 家）</span>
+      </div>
+      <div class="kpi-card amber">
+        <span class="kpi-label">当前排队中（处理中 / 已聆讯）</span>
+        <span class="kpi-value">${(processing + heard).toLocaleString()}</span>
+        <span class="kpi-sub">处理中 ${processing} 家 · 已聆讯 ${heard} 家</span>
+      </div>
+      <div class="kpi-card green">
+        <span class="kpi-label">港股已上市</span>
+        <span class="kpi-value">${listed.toLocaleString()}</span>
+        <span class="kpi-sub">披露易申请后成功挂牌汇总</span>
+      </div>
+      <div class="kpi-card">
+        <span class="kpi-label">证监会境外备案推进中</span>
+        <span class="kpi-value">${csrcActive.toLocaleString()}</span>
+        <span class="kpi-sub">证监会备案表截至 ${escapeHtml(csrcDate)}</span>
+      </div>
+    `;
+  }
+
+  function getFilteredHk() {
+    const { structure, hkexStatus, csrcStatus, keyword, sortBy, sortDir } = state.hkFilters;
+    const kw = keyword.trim().toLowerCase();
+    const list = state.hkRecords.filter((r) => {
+      if (structure !== "全部" && r.structure !== structure) return false;
+      if (hkexStatus !== "全部" && r.hkex_status !== hkexStatus) return false;
+      if (csrcStatus !== "全部" && r.csrc_status !== csrcStatus) return false;
+      if (kw) {
+        const hay = `${r.company} ${r.company_tc || ""} ${r.stock_code || ""} ${r.headquarters || ""} ${r.reg_place || ""} ${(r.sponsors || []).join(" ")} ${r.filing_entity || ""}`.toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+    const dir = sortDir === "asc" ? 1 : -1;
+    list.sort((a, b) => {
+      const va = a[sortBy] || "";
+      const vb = b[sortBy] || "";
+      if (va === vb) return 0;
+      return va > vb ? dir : -dir;
+    });
+    return list;
+  }
+
+  function openHkDetailModal(rec) {
+    const old = document.getElementById("hk-detail-modal");
+    if (old) old.remove();
+
+    const tagsHtml = (rec.tags || [])
+      .map((t) => `<span class="hk-badge-tag hk-tag-${escapeHtml(t)}">${escapeHtml(t)}</span>`)
+      .join("");
+    const sponsorsText = (rec.sponsors && rec.sponsors.length) ? rec.sponsors.map((s) => escapeHtml(s)).join("、") : "—";
+    const lawyersText = (rec.law_firms && rec.law_firms.length) ? rec.law_firms.map((s) => escapeHtml(s)).join("、") : "—";
+    const docsHtml = (rec.docs && rec.docs.length)
+      ? rec.docs.map((d) => `
+          <a class="doc-item" href="${escapeHtml(d.url)}" target="_blank" rel="noopener noreferrer" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border:1px solid #eef0f3;border-radius:8px;margin-bottom:8px;text-decoration:none;color:#1f2937;">
+            <span>${escapeHtml(d.title || "申请版本文件")}</span>
+            <span style="color:#6b7280;font-size:12px;margin-left:12px;white-space:nowrap;">${escapeHtml(d.date || "")} ↗</span>
+          </a>`).join("")
+      : `<div style="color:#8f959e;font-size:13px;padding:8px 0;">暂无公开可直链的申请版本/聆讯后资料集文件（或已归档）</div>`;
+
+    const modal = document.createElement("div");
+    modal.id = "hk-detail-modal";
+    modal.className = "hk-modal-backdrop";
+    modal.innerHTML = `
+      <div class="hk-modal-card" role="dialog" aria-modal="true">
+        <div class="hk-modal-header">
+          <div>
+            <div style="font-size:17px;font-weight:700;color:#111827;">
+              ${rec.stock_code ? `<span class="hk-code-pill">${escapeHtml(rec.stock_code)}</span>` : ""}
+              ${escapeHtml(rec.company)}${tagsHtml}
+            </div>
+            <div style="font-size:12.5px;color:#6b7280;margin-top:4px;">
+              申报板块：${escapeHtml(rec.board)} · 上市架构：${escapeHtml(rec.structure)} · 累计递表：${rec.attempt_count || 1} 次
+            </div>
+          </div>
+          <button id="hk-modal-close-btn" class="hk-modal-close" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="info-grid" style="margin-bottom:16px;">
+          <div class="info-item"><span class="info-label">港交所审核状态</span><span class="info-value">${escapeHtml(rec.hkex_status)}</span></div>
+          <div class="info-item"><span class="info-label">证监会备案状态</span><span class="info-value">${escapeHtml(rec.csrc_status)}</span></div>
+          <div class="info-item"><span class="info-label">注册地址 / 总部</span><span class="info-value">${escapeHtml(rec.reg_place || "—")} / ${escapeHtml(rec.headquarters || "—")}</span></div>
+          <div class="info-item"><span class="info-label">递表 / 最新更新</span><span class="info-value">${escapeHtml(rec.submit_date || "—")} / ${escapeHtml(rec.update_date || "—")}</span></div>
+          <div class="info-item"><span class="info-label">保荐人/主承销商</span><span class="info-value">${sponsorsText}</span></div>
+          <div class="info-item"><span class="info-label">境内律师</span><span class="info-value">${lawyersText}</span></div>
+          ${rec.filing_entity ? `<div class="info-item"><span class="info-label">境内申报主体</span><span class="info-value">${escapeHtml(rec.filing_entity)}</span></div>` : ""}
+          ${rec.csrc_receive_date ? `<div class="info-item"><span class="info-label">证监会接收日期</span><span class="info-value">${escapeHtml(rec.csrc_receive_date)}</span></div>` : ""}
+        </div>
+        <div style="font-size:13.5px;font-weight:600;color:#111827;margin-bottom:8px;">港交所披露易公开文件</div>
+        <div>${docsHtml}</div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal || e.target.id === "hk-modal-close-btn") modal.remove();
+    });
+  }
+
+  function renderHkTable() {
+    renderHkKpis();
+    const filtered = getFilteredHk();
+    const total = filtered.length;
+    const { pageSize } = state.hkFilters;
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    if (state.hkFilters.page > totalPages) state.hkFilters.page = totalPages;
+
+    const start = (state.hkFilters.page - 1) * pageSize;
+    const pageRows = filtered.slice(start, start + pageSize);
+
+    $("hk-count").innerHTML = `为您找到 <b style="color:#d93025;font-size:15px;">${total.toLocaleString()}</b> 条港股 IPO 记录`;
+
+    const tbody = $("hk-tbody");
+    if (!pageRows.length) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:36px;color:#80868b;">未找到符合条件的港股 IPO 记录</td></tr>`;
+    } else {
+      tbody.innerHTML = pageRows
+        .map((r, idx) => {
+          const hkStatusClass = "hk-status-" + (r.hkex_status || "").replace("/", "");
+          const csrcStatusClass = "csrc-status-" + (r.csrc_status || "不适用").replace("/", "");
+          const tagsHtml = (r.tags || [])
+            .map((t) => `<span class="hk-badge-tag hk-tag-${escapeHtml(t)}">${escapeHtml(t)}</span>`)
+            .join("");
+          const codeHtml = r.stock_code ? `<span class="hk-code-pill">${escapeHtml(r.stock_code)}</span>` : "";
+          const sponsorsHtml = (r.sponsors && r.sponsors.length)
+            ? `<div class="hk-sponsors-col">${r.sponsors.map((s) => `<div>${escapeHtml(s)}</div>`).join("")}</div>`
+            : `<span style="color:#94a3b8;">—</span>`;
+
+          return `
+            <tr class="clickable-row" data-hk-idx="${idx}">
+              <td><span class="row-index-badge">${start + idx + 1}</span></td>
+              <td>
+                <div style="font-weight:500;color:#111827;">${codeHtml}${escapeHtml(r.company)}${tagsHtml}</div>
+              </td>
+              <td>${escapeHtml(r.board || "主板")}</td>
+              <td>${escapeHtml(r.structure || "—")}</td>
+              <td><span class="stage-tag ${escapeHtml(hkStatusClass)}">${escapeHtml(r.hkex_status)}</span></td>
+              <td><span class="stage-tag ${escapeHtml(csrcStatusClass)}">${escapeHtml(r.csrc_status)}</span></td>
+              <td>${escapeHtml(r.reg_place || "—")}</td>
+              <td>${escapeHtml(r.headquarters || "—")}</td>
+              <td>${sponsorsHtml}</td>
+              <td>${escapeHtml(r.update_date || "—")}</td>
+              <td>${escapeHtml(r.submit_date || "—")}</td>
+            </tr>
+          `;
+        })
+        .join("");
+
+      tbody.querySelectorAll("tr[data-hk-idx]").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const item = pageRows[Number(tr.dataset.hkIdx)];
+          if (item) openHkDetailModal(item);
+        });
+      });
+    }
+
+    $("hk-page-info").textContent = `第 ${state.hkFilters.page} / ${totalPages} 页`;
+    $("hk-prev-page").disabled = state.hkFilters.page <= 1;
+    $("hk-next-page").disabled = state.hkFilters.page >= totalPages;
+    renderPageNumbers("hk-prev-page", state.hkFilters.page, totalPages, (p) => {
+      state.hkFilters.page = p;
+      renderHkTable();
+    });
+  }
+
   // ==================== 路由与按需懒加载控制 ====================
   function updateBrowserUrl(routePath, titleText, replace = false) {
     const cleanTitle = titleText ? `${titleText} · IPO 智览` : "IPO 智览 · 首发上市全景看板";
@@ -2812,10 +2962,11 @@
     $("view-issuance").classList.toggle("hidden", tabName !== "发行动态");
     if ($("view-inspection")) $("view-inspection").classList.toggle("hidden", tabName !== "现场检查");
     if ($("view-regulatory")) $("view-regulatory").classList.toggle("hidden", tabName !== "监管措施");
+    if ($("view-hk")) $("view-hk").classList.toggle("hidden", tabName !== "港股IPO");
     $("view-tutoring").classList.toggle("hidden", tabName !== "辅导备案");
     $("view-neeq").classList.toggle("hidden", tabName !== "新三板挂牌");
 
-    const builtTabs = new Set(["全景图", "审核动态", "上市委审议", "发行动态", "现场检查", "监管措施", "辅导备案", "新三板挂牌"]);
+    const builtTabs = new Set(["全景图", "审核动态", "上市委审议", "发行动态", "现场检查", "监管措施", "辅导备案", "新三板挂牌", "港股IPO"]);
     const placeholder = $("view-placeholder");
     if (!builtTabs.has(tabName)) {
       const info = FUTURE_TAB_INFO[tabName] || { title: tabName, desc: "后续规划接入", source: "" };
@@ -2887,6 +3038,12 @@
         await ensureDataset("neeq");
       }
       renderNeeqTable();
+    } else if (tabName === "港股IPO") {
+      if (!state.loaded.hk) {
+        $("hk-tbody").innerHTML = `<tr><td colspan="11" style="text-align:center;padding:36px;color:#80868b;">正在按需加载港股 IPO 与证监会境外备案数据...</td></tr>`;
+        await ensureDataset("hk");
+      }
+      renderHkTable();
     }
   }
 
@@ -3323,6 +3480,59 @@
     if ($("reg-page-size")) $("reg-page-size").addEventListener("change", (e) => { state.regFilters.pageSize = Number(e.target.value) || 30; state.regFilters.page = 1; renderRegulatoryTable(); });
     if ($("reg-prev-page")) $("reg-prev-page").addEventListener("click", () => { if (state.regFilters.page > 1) { state.regFilters.page -= 1; renderRegulatoryTable(); } });
     if ($("reg-next-page")) $("reg-next-page").addEventListener("click", () => { state.regFilters.page += 1; renderRegulatoryTable(); });
+
+    const syncHkUI = () => {
+      document.querySelectorAll("#hk-structure-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.hkFilters.structure));
+      document.querySelectorAll("#hk-status-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.hkFilters.hkexStatus));
+      document.querySelectorAll("#hk-csrc-chips .chip-btn").forEach((b) => b.classList.toggle("active", b.dataset.val === state.hkFilters.csrcStatus));
+      if ($("hk-keyword")) $("hk-keyword").value = state.hkFilters.keyword;
+      if ($("hk-clear-search")) $("hk-clear-search").classList.toggle("hidden", !state.hkFilters.keyword);
+    };
+    document.querySelectorAll("#hk-structure-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.hkFilters.structure = btn.dataset.val; state.hkFilters.page = 1; syncHkUI(); renderHkTable(); });
+    });
+    document.querySelectorAll("#hk-status-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.hkFilters.hkexStatus = btn.dataset.val; state.hkFilters.page = 1; syncHkUI(); renderHkTable(); });
+    });
+    document.querySelectorAll("#hk-csrc-chips .chip-btn").forEach((btn) => {
+      btn.addEventListener("click", () => { state.hkFilters.csrcStatus = btn.dataset.val; state.hkFilters.page = 1; syncHkUI(); renderHkTable(); });
+    });
+    if ($("hk-keyword")) {
+      $("hk-keyword").addEventListener("input", (e) => {
+        state.hkFilters.keyword = e.target.value; state.hkFilters.page = 1;
+        $("hk-clear-search").classList.toggle("hidden", !state.hkFilters.keyword);
+        renderHkTable();
+      });
+    }
+    if ($("hk-clear-search")) {
+      $("hk-clear-search").addEventListener("click", () => {
+        state.hkFilters.keyword = ""; state.hkFilters.page = 1; syncHkUI(); renderHkTable(); $("hk-keyword").focus();
+      });
+    }
+    if ($("hk-reset")) {
+      $("hk-reset").addEventListener("click", () => {
+        const sz = state.hkFilters.pageSize;
+        state.hkFilters = { structure: "全部", hkexStatus: "全部", csrcStatus: "全部", keyword: "", sortBy: "update_date", sortDir: "desc", page: 1, pageSize: sz };
+        syncHkUI(); renderHkTable();
+      });
+    }
+    if ($("hk-sort-update")) {
+      $("hk-sort-update").addEventListener("click", () => {
+        if (state.hkFilters.sortBy === "update_date") state.hkFilters.sortDir = state.hkFilters.sortDir === "desc" ? "asc" : "desc";
+        else { state.hkFilters.sortBy = "update_date"; state.hkFilters.sortDir = "desc"; }
+        renderHkTable();
+      });
+    }
+    if ($("hk-sort-submit")) {
+      $("hk-sort-submit").addEventListener("click", () => {
+        if (state.hkFilters.sortBy === "submit_date") state.hkFilters.sortDir = state.hkFilters.sortDir === "desc" ? "asc" : "desc";
+        else { state.hkFilters.sortBy = "submit_date"; state.hkFilters.sortDir = "desc"; }
+        renderHkTable();
+      });
+    }
+    if ($("hk-page-size")) $("hk-page-size").addEventListener("change", (e) => { state.hkFilters.pageSize = Number(e.target.value) || 20; state.hkFilters.page = 1; renderHkTable(); });
+    if ($("hk-prev-page")) $("hk-prev-page").addEventListener("click", () => { if (state.hkFilters.page > 1) { state.hkFilters.page -= 1; renderHkTable(); } });
+    if ($("hk-next-page")) $("hk-next-page").addEventListener("click", () => { state.hkFilters.page += 1; renderHkTable(); });
 
     const handleRouteRestore = async () => {
       const route = parseRouteFromLocation();
