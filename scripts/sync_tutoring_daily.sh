@@ -6,6 +6,7 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PA
 
 REPO_DIR="/Users/waltergao/.gemini/antigravity/scratch/ipoflow"
 cd "$REPO_DIR"
+git rebase --abort >/dev/null 2>&1 || true
 
 retry_cmd() {
   local max_attempts=3
@@ -26,7 +27,12 @@ retry_cmd() {
 
 git_pull_rebase() {
   git rebase --abort >/dev/null 2>&1 || true
-  git pull --rebase --autostash origin main --quiet
+  git fetch origin main --quiet
+  if ! git rebase --autostash origin/main --quiet; then
+    git rebase --abort >/dev/null 2>&1 || true
+    echo "[WARN] 检测到单行 JSON 合并冲突，使用 -X theirs 保留本地最新辅导备案数据重新变基..."
+    git rebase --autostash -X theirs origin/main --quiet
+  fi
 }
 
 echo "============================================================"
