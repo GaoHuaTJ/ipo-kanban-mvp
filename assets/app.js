@@ -868,6 +868,22 @@
     $("btn-toggle-advanced").classList.toggle("active-toggle", hasAdv || !$("advanced-drawer").classList.contains("hidden"));
   }
 
+  function normalizeCompanyKey(name) {
+    return String(name || "").replace(/[（()）\s\u3000]/g, "");
+  }
+
+  function getInspectionForCompany(companyName) {
+    const key = normalizeCompanyKey(companyName);
+    if (!key || !state.inspectionRecords.length) return [];
+    return state.inspectionRecords.filter((x) => normalizeCompanyKey(x.company) === key);
+  }
+
+  function getRegulatoryForCompany(companyName) {
+    const key = normalizeCompanyKey(companyName);
+    if (!key || !state.regulatoryRecords.length) return [];
+    return state.regulatoryRecords.filter((x) => normalizeCompanyKey(x.company) === key);
+  }
+
   function getFilteredRecords() {
     const { exchange, board, stage, province, keyword, sortBy } = state.filters;
     const kw = keyword.trim().toLowerCase();
@@ -882,12 +898,15 @@
       }
       if (province !== "全部" && r.province !== province) return false;
       if (kw) {
+        const inspList = getInspectionForCompany(r.company);
+        const inspText = inspList.length ? `现场检查 ${inspList.map((x) => x.batch || "").join(" ")}` : "";
         const hay = [
           r.company,
           r.industry,
           r.province,
           r.exchange,
           r.board,
+          inspText,
           ...(r.sponsors || []),
           ...(r.law_firms || []),
           ...(r.accounting_firms || []),
@@ -921,11 +940,16 @@
     } else {
       tbody.innerHTML = pageRows
         .map(
-          (r, idx) => `
+          (r, idx) => {
+            const inspHits = getInspectionForCompany(r.company);
+            const inspBadge = inspHits.length
+              ? `<span class="tut-inline-badge inspection" title="${escapeHtml(inspHits.map((x) => `${x.lottery_date || ""} ${x.batch || ""}`).join("；"))}">现场检查${inspHits[0].batch ? " · " + escapeHtml(inspHits[0].batch) : ""}</span>`
+              : "";
+            return `
           <tr class="clickable-row" data-rec-idx="${idx}">
             <td><span class="row-index-badge">${start + idx + 1}</span></td>
             <td>
-              <span class="company-link">${escapeHtml(r.company)}</span>
+              <span class="company-link">${escapeHtml(r.company)}</span>${inspBadge}
               <div class="company-industry">${escapeHtml(r.industry || "")}</div>
             </td>
             <td style="white-space:nowrap;color:#5f6368;font-weight:500;">${escapeHtml(r.exchange)}</td>
@@ -937,7 +961,8 @@
             <td style="color:#5f6368;">${escapeHtml((r.accounting_firms || []).join("、") || "-")}</td>
             <td class="date-cell">${escapeHtml(r.update_date || "-")}</td>
             <td class="date-cell muted">${escapeHtml(r.accept_date || "-")}</td>
-          </tr>`
+          </tr>`;
+          }
         )
         .join("");
 
@@ -986,7 +1011,42 @@
       .join("");
   }
 
+  function formatDetailInspectionInfo(companyName) {
+    if (!state.loaded.inspection) return { text: "加载中...", isHighlight: false };
+    const hits = getInspectionForCompany(companyName);
+    if (!hits.length) return { text: "无", isHighlight: false };
+    const text = hits
+      .map((x) => {
+        const parts = [];
+        if (x.batch) parts.push(x.batch);
+        const sub = [];
+        if (x.lottery_date) sub.push(`抽签日期 ${x.lottery_date}`);
+        if (x.ratio) sub.push(`抽签比例 ${x.ratio}`);
+        return sub.length ? `${parts.join("")}（${sub.join("，")}）` : parts.join("");
+      })
+      .join("；");
+    return { text: text || "是", isHighlight: true };
+  }
+
+  function formatDetailRegulatoryHtml(companyName) {
+    if (!state.loaded.regulatory) return "加载中...";
+    const hits = getRegulatoryForCompany(companyName);
+    if (!hits.length) return "无";
+    return `<div class="detail-reg-list">${hits
+      .map((r) => {
+        const prefix = [r.announce_date, r.regulator, r.category].filter(Boolean).join(" · ");
+        const title = escapeHtml(r.title || "监管措施决定书");
+        const docEl = r.pdf_url
+          ? `<a href="${escapeHtml(r.pdf_url)}" target="_blank" rel="noopener noreferrer" title="打开官方原文 PDF">${title} ↗</a>`
+          : `<span>${title}</span>`;
+        return `<div class="detail-reg-item">${prefix ? `<span style="color:#5f6368;">[${escapeHtml(prefix)}]</span> ` : ""}${docEl}</div>`;
+      })
+      .join("")}</div>`;
+  }
+
   function renderDetailInfo(info) {
+    const inspMeta = formatDetailInspectionInfo(info.company);
+    const regHtml = formatDetailRegulatoryHtml(info.company);
     const fields = [
       ["公司全称", info.company, false],
       ["行业类别", info.industry || "—", false],
@@ -1001,6 +1061,7 @@
       ["受理日期", info.accept_date || "—", false],
       ["板块定位", info.board_position || "—", false],
       ["注册地", info.province || "—", false],
+      ["现场检查", inspMeta.text, inspMeta.isHighlight],
       [
         "官方审核页",
         info.source_url
@@ -1009,6 +1070,7 @@
         false,
         true,
       ],
+      ["监管措施", regHtml, false, true],
     ];
 
     $("detail-info-grid").innerHTML = fields
@@ -1173,8 +1235,21 @@
     renderDetailInfo(baseInfo);
     $("detail-docs-preview").innerHTML = `<div style="color:#8f959e;font-size:13px;">正在实时拉取官方信披 PDF 列表...</div>`;
 
-    // 2. 命中前端会话缓存直接渲染
     const cacheKey = `${rec.exchange}::${rec.company}`;
+    let activeInfo = baseInfo;
+    if (!state.loaded.inspection || !state.loaded.regulatory) {
+      Promise.all([ensureDataset("inspection"), ensureDataset("regulatory")]).then(() => {
+        if (state.currentDetailRec === rec) {
+          if (state.detailCache[cacheKey]) {
+            applyLiveDetail(state.detailCache[cacheKey], rec);
+          } else {
+            renderDetailInfo(activeInfo);
+          }
+        }
+      });
+    }
+
+    // 2. 命中前端会话缓存直接渲染
     if (state.detailCache[cacheKey]) {
       applyLiveDetail(state.detailCache[cacheKey], rec);
       return;
@@ -1202,13 +1277,14 @@
         `当前未检测到 <code>/api/project-detail</code> 实时透传服务，已展示本地快照基础信息。如需实时获取<b>计划募集资金、保代/签字律师/签字会计师、精确时间轴与招股书 PDF</b>，请在项目目录运行 <code>python3 server.py</code> 后访问 <code>http://127.0.0.1:8080</code>，或直接部署至 Cloudflare Pages。`;
       $("detail-fallback-notice").classList.remove("hidden");
 
-      renderDetailInfo({
+      activeInfo = {
         ...baseInfo,
         plan_raise_yi: "需启动 server.py 或部署 Cloudflare Pages 实时获取",
         sponsor_reps: "需实时透传获取",
         accountants: "需实时透传获取",
         lawyers: "需实时透传获取",
-      });
+      };
+      renderDetailInfo(activeInfo);
       renderDocuments([]);
     }
   }
@@ -2739,9 +2815,9 @@
         if (rightOrgChart) rightOrgChart.resize();
       }, 50);
     } else if (tabName === "审核动态") {
-      if (!state.loaded.ipo) {
+      if (!state.loaded.ipo || !state.loaded.inspection) {
         $("dynamics-tbody").innerHTML = `<tr><td colspan="11" style="text-align:center;padding:36px;color:#80868b;">正在按需加载 A股IPO 审核动态数据...</td></tr>`;
-        await ensureDataset("ipo");
+        await Promise.all([ensureDataset("ipo"), ensureDataset("inspection")]);
       }
       renderDynamicsTable();
     } else if (tabName === "上市委审议") {

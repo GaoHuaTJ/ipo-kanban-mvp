@@ -2041,6 +2041,34 @@ body {
   box-shadow: 0 1px 2px rgba(67, 56, 202, 0.12);
 }
 
+.tut-inline-badge.inspection {
+  border-color: #f28b82;
+  background: #fce8e6;
+  color: #c5221f;
+  box-shadow: 0 1px 2px rgba(197, 34, 31, 0.12);
+}
+
+.detail-reg-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-reg-item {
+  line-height: 1.5;
+  font-size: 13px;
+}
+
+.detail-reg-item a {
+  color: var(--g-blue);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.detail-reg-item a:hover {
+  text-decoration: underline;
+}
+
 .detail-badge-retutor {
   background: #eef2ff;
   border-color: #a5b4fc;
