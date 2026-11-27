@@ -2300,7 +2300,7 @@
       tbody.innerHTML = pageRows
         .map(
           (r, idx) => `
-          <tr>
+          <tr class="clickable-row" data-neeq-idx="${idx}">
             <td><span class="row-index-badge">${start + idx + 1}</span></td>
             <td style="white-space:nowrap;"><span class="stock-code-pill">${escapeHtml(r.code)}</span><span class="company-link">${escapeHtml(r.abbr)}</span></td>
             <td><span class="board-tag tier-${escapeHtml(r.tier)}">${escapeHtml(r.tier)}</span></td>
@@ -2314,6 +2314,18 @@
           </tr>`
         )
         .join("");
+
+      tbody.querySelectorAll("tr[data-neeq-idx]").forEach((tr) => {
+        tr.addEventListener("click", () => {
+          const item = pageRows[Number(tr.dataset.neeqIdx)];
+          if (!item || !item.code) return;
+          window.open(
+            `https://www.neeq.com.cn/products/neeq_listed_companies/index.html?companyCode=${encodeURIComponent(item.code)}`,
+            "_blank",
+            "noopener,noreferrer"
+          );
+        });
+      });
     }
 
     $("neeq-page-info").textContent = `第 ${state.neeqFilters.page} / ${totalPages} 页`;
@@ -2653,7 +2665,7 @@
           const regOrg = r.regulator || "证监会";
           const cat = r.category || "监管措施";
           return `
-            <tr>
+            <tr class="clickable-row" data-reg-idx="${idx}">
               <td><span class="row-index-badge">${start + idx + 1}</span></td>
               <td>${docHtml}</td>
               <td>${compHtml}</td>
@@ -2665,10 +2677,11 @@
         })
         .join("");
 
-      tbody.querySelectorAll(".reg-proj-link").forEach((el) => {
-        el.addEventListener("click", () => {
-          const item = pageRows[Number(el.dataset.regIdx)];
-          if (!item || !item.company) return;
+      tbody.querySelectorAll("tr[data-reg-idx]").forEach((tr) => {
+        tr.addEventListener("click", (e) => {
+          if (e.target.closest("a.reg-doc-link")) return;
+          const item = pageRows[Number(tr.dataset.regIdx)];
+          if (!item || !item.company || item.company === "—") return;
           openCompanyDetailByName(item.company, {
             exchange: item.regulator === "上交所" || item.regulator === "深交所" || item.regulator === "北交所" ? item.regulator : "上交所",
             stage: item.stage,
@@ -2719,31 +2732,31 @@
     const csrcActive = all.filter((r) => ["备案受理", "备案反馈", "备案同意"].includes(r.csrc_status)).length;
     const csrcDate = (state.hkMeta && state.hkMeta.csrc_table_date) || "每周更新";
     el.innerHTML = `
+      <div class="kpi-card kpi-blue">
+        <div class="kpi-label">港股 IPO 全量库</div>
+        <div class="kpi-value">${all.length.toLocaleString()}</div>
+        <div class="kpi-sub">港交所披露易主板 + GEM（含 A+H ${ahCount} 家）</div>
+      </div>
+      <div class="kpi-card kpi-amber">
+        <div class="kpi-label">当前排队中（处理中 / 已聆讯）</div>
+        <div class="kpi-value">${(processing + heard).toLocaleString()}</div>
+        <div class="kpi-sub">处理中 ${processing} 家 · 已聆讯 ${heard} 家</div>
+      </div>
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">港股已上市</div>
+        <div class="kpi-value">${listed.toLocaleString()}</div>
+        <div class="kpi-sub">披露易申请后成功挂牌汇总</div>
+      </div>
       <div class="kpi-card">
-        <span class="kpi-label">港股 IPO 全量库</span>
-        <span class="kpi-value">${all.length.toLocaleString()}</span>
-        <span class="kpi-sub">港交所披露易主板 + GEM（含 A+H ${ahCount} 家）</span>
-      </div>
-      <div class="kpi-card amber">
-        <span class="kpi-label">当前排队中（处理中 / 已聆讯）</span>
-        <span class="kpi-value">${(processing + heard).toLocaleString()}</span>
-        <span class="kpi-sub">处理中 ${processing} 家 · 已聆讯 ${heard} 家</span>
-      </div>
-      <div class="kpi-card green">
-        <span class="kpi-label">港股已上市</span>
-        <span class="kpi-value">${listed.toLocaleString()}</span>
-        <span class="kpi-sub">披露易申请后成功挂牌汇总</span>
-      </div>
-      <div class="kpi-card">
-        <span class="kpi-label">证监会境外备案推进中</span>
-        <span class="kpi-value">${csrcActive.toLocaleString()}</span>
-        <span class="kpi-sub">证监会备案表截至 ${escapeHtml(csrcDate)}</span>
+        <div class="kpi-label">证监会境外备案推进中</div>
+        <div class="kpi-value">${csrcActive.toLocaleString()}</div>
+        <div class="kpi-sub">证监会备案表截至 ${escapeHtml(csrcDate)}</div>
       </div>
     `;
   }
 
   function getFilteredHk() {
-    const { structure, hkexStatus, csrcStatus, keyword, sortBy, sortDir } = state.hkFilters;
+    const { structure, hkexStatus, csrcStatus, keyword } = state.hkFilters;
     const kw = keyword.trim().toLowerCase();
     const list = state.hkRecords.filter((r) => {
       if (structure !== "全部" && r.structure !== structure) return false;
@@ -2755,12 +2768,11 @@
       }
       return true;
     });
-    const dir = sortDir === "asc" ? 1 : -1;
     list.sort((a, b) => {
-      const va = a[sortBy] || "";
-      const vb = b[sortBy] || "";
-      if (va === vb) return 0;
-      return va > vb ? dir : -dir;
+      const ua = a.update_date || "";
+      const ub = b.update_date || "";
+      if (ua !== ub) return ub > ua ? 1 : -1;
+      return (b.submit_date || "") > (a.submit_date || "") ? 1 : -1;
     });
     return list;
   }
@@ -2852,7 +2864,7 @@
             <tr class="clickable-row" data-hk-idx="${idx}">
               <td><span class="row-index-badge">${start + idx + 1}</span></td>
               <td>
-                <div style="font-weight:500;color:#111827;">${codeHtml}${escapeHtml(r.company)}${tagsHtml}</div>
+                <div class="company-link">${codeHtml}${escapeHtml(r.company)}${tagsHtml}</div>
               </td>
               <td>${escapeHtml(r.board || "主板")}</td>
               <td>${escapeHtml(r.structure || "—")}</td>
@@ -2861,8 +2873,8 @@
               <td>${escapeHtml(r.reg_place || "—")}</td>
               <td>${escapeHtml(r.headquarters || "—")}</td>
               <td>${sponsorsHtml}</td>
-              <td>${escapeHtml(r.update_date || "—")}</td>
-              <td>${escapeHtml(r.submit_date || "—")}</td>
+              <td class="date-cell">${escapeHtml(r.update_date || "—")}</td>
+              <td class="date-cell">${escapeHtml(r.submit_date || "—")}</td>
             </tr>
           `;
         })
@@ -3512,22 +3524,8 @@
     if ($("hk-reset")) {
       $("hk-reset").addEventListener("click", () => {
         const sz = state.hkFilters.pageSize;
-        state.hkFilters = { structure: "全部", hkexStatus: "全部", csrcStatus: "全部", keyword: "", sortBy: "update_date", sortDir: "desc", page: 1, pageSize: sz };
+        state.hkFilters = { structure: "全部", hkexStatus: "全部", csrcStatus: "全部", keyword: "", page: 1, pageSize: sz };
         syncHkUI(); renderHkTable();
-      });
-    }
-    if ($("hk-sort-update")) {
-      $("hk-sort-update").addEventListener("click", () => {
-        if (state.hkFilters.sortBy === "update_date") state.hkFilters.sortDir = state.hkFilters.sortDir === "desc" ? "asc" : "desc";
-        else { state.hkFilters.sortBy = "update_date"; state.hkFilters.sortDir = "desc"; }
-        renderHkTable();
-      });
-    }
-    if ($("hk-sort-submit")) {
-      $("hk-sort-submit").addEventListener("click", () => {
-        if (state.hkFilters.sortBy === "submit_date") state.hkFilters.sortDir = state.hkFilters.sortDir === "desc" ? "asc" : "desc";
-        else { state.hkFilters.sortBy = "submit_date"; state.hkFilters.sortDir = "desc"; }
-        renderHkTable();
       });
     }
     if ($("hk-page-size")) $("hk-page-size").addEventListener("change", (e) => { state.hkFilters.pageSize = Number(e.target.value) || 20; state.hkFilters.page = 1; renderHkTable(); });
