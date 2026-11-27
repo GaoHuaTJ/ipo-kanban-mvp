@@ -2279,6 +2279,56 @@
     `;
   }
 
+  function openNeeqDetailModal(rec) {
+    const old = document.getElementById("neeq-detail-modal");
+    if (old) old.remove();
+
+    const sharesText =
+      rec.total_shares_wan !== null && rec.total_shares_wan !== undefined
+        ? `${rec.total_shares_wan.toLocaleString()} 万股`
+        : "—";
+    const epsText =
+      rec.eps !== null && rec.eps !== undefined ? `${rec.eps.toFixed(2)} 元` : "—";
+
+    const modal = document.createElement("div");
+    modal.id = "neeq-detail-modal";
+    modal.className = "hk-modal-backdrop";
+    modal.innerHTML = `
+      <div class="hk-modal-card" role="dialog" aria-modal="true">
+        <div class="hk-modal-header">
+          <div>
+            <div style="font-size:17px;font-weight:700;color:#111827;">
+              <span class="hk-code-pill">${escapeHtml(rec.code)}</span>${escapeHtml(rec.abbr)}
+            </div>
+            <div style="font-size:12.5px;color:#6b7280;margin-top:4px;">
+              市场分层：${escapeHtml(rec.tier || "—")} · 交易方式：${escapeHtml(rec.trade_type || "—")} · 挂牌日期：${escapeHtml(rec.list_date || "—")}
+            </div>
+          </div>
+          <button id="neeq-modal-close-btn" class="hk-modal-close" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="info-grid" style="margin-bottom:16px;">
+          <div class="info-item"><span class="info-label">证券代码</span><span class="info-value">${escapeHtml(rec.code || "—")}</span></div>
+          <div class="info-item"><span class="info-label">证券简称</span><span class="info-value">${escapeHtml(rec.abbr || "—")}</span></div>
+          <div class="info-item"><span class="info-label">市场分层</span><span class="info-value">${escapeHtml(rec.tier || "—")}</span></div>
+          <div class="info-item"><span class="info-label">挂牌日期</span><span class="info-value">${escapeHtml(rec.list_date || "—")}</span></div>
+          <div class="info-item"><span class="info-label">所属地区</span><span class="info-value">${escapeHtml(rec.province || "—")}</span></div>
+          <div class="info-item"><span class="info-label">所属行业</span><span class="info-value">${escapeHtml(rec.industry || "—")}</span></div>
+          <div class="info-item"><span class="info-label">主办券商</span><span class="info-value">${escapeHtml(rec.broker || "—")}</span></div>
+          <div class="info-item"><span class="info-label">交易方式</span><span class="info-value">${escapeHtml(rec.trade_type || "—")}</span></div>
+          <div class="info-item"><span class="info-label">总股本</span><span class="info-value">${sharesText}</span></div>
+          <div class="info-item"><span class="info-label">每股收益</span><span class="info-value">${epsText}</span></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <a class="action-btn sm" href="https://www.neeq.com.cn/" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">前往全国股转系统官网 ↗</a>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal || e.target.id === "neeq-modal-close-btn") modal.remove();
+    });
+  }
+
   function renderNeeqTable() {
     const filtered = getFilteredNeeq();
     renderNeeqKPI(filtered);
@@ -2318,12 +2368,7 @@
       tbody.querySelectorAll("tr[data-neeq-idx]").forEach((tr) => {
         tr.addEventListener("click", () => {
           const item = pageRows[Number(tr.dataset.neeqIdx)];
-          if (!item || !item.code) return;
-          window.open(
-            `https://www.neeq.com.cn/products/neeq_listed_companies/index.html?companyCode=${encodeURIComponent(item.code)}`,
-            "_blank",
-            "noopener,noreferrer"
-          );
+          if (item) openNeeqDetailModal(item);
         });
       });
     }
